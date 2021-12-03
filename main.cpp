@@ -5,6 +5,7 @@
 #include <string>
 #include <cstdlib>
 #include <climits>
+#include <cstdio>
 
 std::vector<const char*> readFileList(std::string filename)
 {
@@ -25,30 +26,56 @@ std::vector<const char*> readFileList(std::string filename)
 	return lines;
 }
 
-enum class ChangeState { DESC, ASC };
+enum DIRECTION { FOR, UP, DOWN };
+
+struct DirCh {
+    DIRECTION dir;
+    int mag;
+};
+
+DirCh parseLine(const char* line)
+{
+    char direction[10] = { '\0' };
+    int mag;
+    DirCh result;
+
+    std::sscanf(line, "%s %d", direction, &mag);
+
+    if (strcmp(direction, "forward") == 0) {
+        result.dir = FOR;
+    } else if (strcmp(direction, "down") == 0) {
+        result.dir = DOWN;
+    } else if (strcmp(direction, "up") == 0) {
+        result.dir = UP;
+    }
+
+    result.mag = mag;
+
+    return result;
+}
 
 int main()
 {
-    std::vector<const char*> list = readFileList("1/data.txt");
-    int old_sum = INT_MAX;
-    ChangeState state = ChangeState::DESC;
-    int count = 0;
+    std::vector<const char*> list = readFileList("2/data.txt");
+    int count;
+    int depth = 0;
+    int aim = 0;
+    int dist = 0;
 
-    for (int i = 0; i < list.size() - 2; i++) {
-        int depth_sum = std::atoi(list[i]) + std::atoi(list[i+1]) + std::atoi(list[i+2]);
+    for (const char* line : list) {
+        DirCh ch = parseLine(line);
 
-        if (depth_sum > old_sum) {
-            state = ChangeState::ASC;
+        if (ch.dir == FOR) {
+            dist += ch.mag;
+            depth += aim*ch.mag;
+        } else if (ch.dir == DOWN) {
+            aim += ch.mag;
         } else {
-            state = ChangeState::DESC;
+            aim -= ch.mag;
         }
-
-        if (state == ChangeState::ASC) {
-            ++count;
-        }
-
-        old_sum = depth_sum;
     }
+    
+    count = depth*dist;
 
     std::cout << count;
 }
