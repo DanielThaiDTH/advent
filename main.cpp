@@ -61,6 +61,8 @@ struct Board
 
         std::cout << std::endl;
     }
+
+    
     bool check(int val)
     {
         bool rowfound = false;
@@ -73,13 +75,13 @@ struct Board
             for (int j = 0; j < 5; j++) {
                 if (!matched[i][j] && val == numbers[i][j]) {
                     matched[i][j] = true;
+                    colfound = matched[0][j] && matched[1][j] && matched[2][j] && matched[3][j] && matched[4][j];
+                    rowfound = matched[i][0] && matched[i][1] && matched[i][2] && matched[i][3] && matched[i][4]; 
                 }
-                colfound = matched[0][j] && matched[1][j] && matched[2][j] && matched[3][j] && matched[4][j];
-                if (colfound)
+                if (colfound || rowfound)
                     break;
             }
-            rowfound = matched[i][0] && matched[i][1] && matched[i][2] && matched[i][3] && matched[i][4]; 
-            if (rowfound)
+            if (colfound || rowfound)
                 break;
         }
 
