@@ -2,6 +2,8 @@
 #include <fstream>
 #include <deque>
 #include <vector>
+#include <map>
+#include <unordered_map>
 #include <string>
 #include <cstdlib>
 #include <climits>
@@ -9,12 +11,7 @@
 #include <algorithm>
 #include <functional>
 #include <sstream>
-
-static const int BITSIZE = 12;
-static const int FIELDSIZE = 5;
-static const int BUNCH = 5;
-
-static_assert(FIELDSIZE%BUNCH == 0);
+#include <cmath>
 
 template<typename T>
 void map(std::vector<T>& vec, std::function<bool(const T&)> f)
@@ -28,183 +25,229 @@ void map(std::vector<T>& vec, std::function<bool(const T&)> f)
     }
 }
 
-std::vector<std::string> readFileList(std::string filename)
+template<typename T>
+T& max(T& a, T& b)
 {
-	std::ifstream listfile(filename);
-
-    if (!listfile)
-        std::cout << "Could not read file\n";
-
-	std::string line;
-	std::vector<std::string> lines;
-
-	while (std::getline(listfile, line)) {
-		//char* copy = new char[line.size() + 1];
-		//std::strcpy(copy, line.c_str());
-		lines.push_back(line);
-	}
-
-	return lines;
+    if (a >= b)
+        return a;
+    else
+        return b;
 }
 
-enum DIRECTION { FOR, UP, DOWN };
-
-struct Board
+struct Line
 {
-    int numbers[FIELDSIZE][FIELDSIZE] = {};
-    bool matched[FIELDSIZE][FIELDSIZE] = {};
-    int colCount[FIELDSIZE] = {};
-    int rowCount[FIELDSIZE] = {};
-    bool isBingo = false;
-    void print()
+    int x1, y1;
+    int x2, y2;
+    bool horizontal() const
     {
-        for (int i = 0; i < FIELDSIZE; i++) {
-            for (int j = 0; j < FIELDSIZE; j++) {
-                std::cout << numbers[i][j] << " ";
-            }
-            std::cout << std::endl;
-        }
-
-        std::cout << std::endl;
+        return y1 == y2;
     }
-
-
-    bool check(int val)
+    bool vertical() const
     {
-        bool rowfound = false;
-        bool colfound = false;
-        
-        if (isBingo)
-            return isBingo;
-
-        for (int i = 0; i < FIELDSIZE; i++) {
-            for (int j = 0; j < FIELDSIZE; j++) {
-                if (!matched[i][j] && val == numbers[i][j]) {
-                    matched[i][j] = true;
-                    colCount[j] += 1;
-                    rowCount[i] += 1;
-                    colfound = colCount[j] == FIELDSIZE;
-                    rowfound = rowCount[i] == FIELDSIZE;
-                }
-                if (colfound || rowfound)
-                    break;
-            }
-            if (colfound || rowfound)
-                break;
-        }
-
-        isBingo = rowfound || colfound;
-
-        return isBingo;
+        return x1 == x2;
     }
-
-    int sum()
+    void reorder()
     {
-        int total = 0;
-        for (int i = 0; i < FIELDSIZE; i++) {
-            for (int j = 0; j < FIELDSIZE; j++) {
-                if (!matched[i][j]) {
-                    total += numbers[i][j];
-                }
-            }
+        if (x1 > x2) {
+            std::swap(x1, x2);
+            std::swap(y1, y2);
         }
-
-        return total;
     }
 };
 
+static auto h = std::hash<std::string>{};
 
-std::vector<int> parseCSV(const std::string& line)
+
+std::string toPointStr(int x, int y)
+{
+    return std::to_string(x) + "," + std::to_string(y);
+}
+
+Line* parse(const std::string& line)
 {
     std::istringstream in(line);
-    std::vector<int> nums;
-    int num = 0;
+    Line* l = new Line();
     char c;
-    while (in >> num) {
-        nums.push_back(num);
-        in >> c;
-    }
-
-    std::cout << std::endl;
-
-    return nums;
-}
-
-Board* parseBoard(const std::vector<std::string>& lines, int start, int end)
-{
-    Board* b = new Board();
-    for (int i = start + 1; i < end; i++) {
-        std::istringstream row(lines[i]);
-        //std::cout << "Building on line: " << row.str() << std::endl;
-        for (int cnt = 0; cnt < FIELDSIZE; cnt++) {
-            row >> b->numbers[i - 1 - start][cnt];
-        }
-        //std::cout << std::endl;
-    }
-
-    //b->print();
-    return b;
-}
-
-int main()
-{
-    std::ifstream file("4/big2.txt");
-
-    std::string drawnStr;
-    std::string line;
-    std::vector<std::string> lines;
-    std::vector<int> splits;
-    std::vector<int> drawnNums;
-    std::vector<Board*> boards;
-    int count = 0;
     
-    std::getline(file, drawnStr);
-    drawnNums = parseCSV(drawnStr);
+    in >> l->x1;
+    in >> c;
+    in >> l->y1;
+    in >> c;
+    in >> c;
+    in >> l->x2;
+    in >> c;
+    in >> l->y2;
+
+    l->reorder();
+
+    return l;
+}
+
+
+int main2()
+{
+    std::ifstream file("5/big.txt");
+    std::string line;
+    std::vector<Line*> lines;
+    std::vector<Line*> hlines;
+    std::vector<Line*> vlines;
+    std::vector<Line*> dlines;
+    std::unordered_map<std::string, int> grid;
+    int count = 0;
+    int count1 = 0;
 
     while (std::getline(file, line)) {
-        lines.push_back(line);
-        if (line.size() <= 2) {
-            splits.push_back(count);
+        lines.push_back(parse(line));
+    }
+
+    std::copy_if(lines.begin(), lines.end(), std::back_inserter(hlines), [](const Line* l){ return l->horizontal(); });
+    std::copy_if(lines.begin(), lines.end(), std::back_inserter(vlines), [](const Line* l){ return l->vertical(); });
+    std::copy_if(lines.begin(), lines.end(), std::back_inserter(dlines), [](const Line* l){ return !l->vertical() && !l->horizontal(); });
+
+    auto insertPoint = [&](std::string&& p) {
+        if (grid.find(p) != grid.end()) {
+            grid[p] += 1;
+        } else {
+            grid[p] = 1;
         }
-        count++;
+    };
+
+    for (const Line* hl : hlines) {
+        for (int x = hl->x1; x <= hl->x2; x++) {
+            insertPoint(toPointStr(x,hl->y1));
+        }
     }
 
-
-
-    for (auto s = 0u; s < splits.size() - 1; s++) {
-        boards.push_back(parseBoard(lines, splits[s], splits[s+1]));
-    }
-    //end board
-    boards.push_back(parseBoard(lines, splits[splits.size() - 1], lines.size()));
-
-    bool bingoCalled = false;
-    int finalSum = 0;
-    int finalNum = 0;
-    Board* finalBoard = nullptr;
-    for (int num : drawnNums) {
-        for (Board* b : boards) {
-            if (b->isBingo) continue;
-            bool bingo = b->check(num);
-            if (bingo) {
-                if (!bingoCalled) {
-                    std::cout << "Bingo on " << num << ", value: ";
-                    std::cout << num*b->sum() << std::endl;
-                    bingoCalled = true;
-                } else {
-                    finalNum = num;
-                    finalBoard = b;
-                }
+    for (const Line* vl : vlines) {
+        if (vl->y1 <= vl->y2) {
+            for (int y = vl->y1; y <= vl->y2; y++) {
+                insertPoint(toPointStr(vl->x1, y));
+            }
+        } else {
+            for (int y = vl->y2; y <= vl->y1; y++) {
+                insertPoint(toPointStr(vl->x1, y));
             }
         }
     }
 
-    finalSum = finalNum*finalBoard->sum();
-
-    std::cout << "Final Bingo on " << finalNum << ", value: ";
-                    std::cout << finalSum << std::endl;
-
-    for (Board*& b : boards) {
-        delete b;
-        b = nullptr;
+    for (const Line* dl : dlines) {
+        if (dl->x1 <= dl->x2 && dl->y1 <= dl->y2) {
+            for (int s = 0; dl->x1+s <= dl->x2; s++) {
+                insertPoint(toPointStr(dl->x1+s, dl->y1+s));
+            }
+        } else if (dl->x1 <= dl->x2 && dl->y1 >= dl->y2) {
+            for (int s = 0; dl->x1+s <= dl->x2; s++) {
+                insertPoint(toPointStr(dl->x1+s, dl->y1-s));
+            }
+        }
     }
+
+    for (auto it = grid.begin(); it != grid.end(); ++it) {
+        if (it->second > 1)
+            count++;
+    }
+
+    std::cout << count;
+
+    for (Line* l : lines) {
+        delete l;
+    }
+
+    return 0;
+}
+
+
+int main()
+{
+    std::ifstream file("5/big2.txt");
+    std::string line;
+    std::vector<Line*> lines;
+    std::vector<Line*> hlines;
+    std::vector<Line*> vlines;
+    std::vector<Line*> dlines;
+    int xmax = 0;
+    int ymax = 0;
+
+    while (std::getline(file, line)) {
+        lines.push_back(parse(line));
+        xmax = max(xmax, max(lines.back()->x1, lines.back()->x2));
+        ymax = max(ymax, max(lines.back()->y1, lines.back()->y2));
+    }
+
+    int** grid = new int*[xmax+1];
+
+    for (int i = 0; i <= xmax; i++) {
+        grid[i] = new int[ymax+1];
+        for (int j = 0; j <= ymax; j++) {
+            grid[i][j] = 0;
+        }
+    }
+
+    std::copy_if(lines.begin(), lines.end(), std::back_inserter(hlines), [](const Line* l){ return l->horizontal(); });
+    std::copy_if(lines.begin(), lines.end(), std::back_inserter(vlines), [](const Line* l){ return l->vertical(); });
+    std::copy_if(lines.begin(), lines.end(), std::back_inserter(dlines), [](const Line* l){ return !l->vertical() && !l->horizontal(); });
+
+    for (const Line* hl : hlines) {
+        for (int x = hl->x1; x <= hl->x2; x++) {
+                grid[x][hl->y1] += 1;
+        }
+    }
+
+    for (const Line* vl : vlines) {
+        if (vl->y1 <= vl->y2) {
+            for (int y = vl->y1; y <= vl->y2; y++) {
+                grid[vl->x1][y] += 1;
+            }
+        } else {
+            for (int y = vl->y2; y <= vl->y1; y++) {
+                grid[vl->x1][y] += 1;
+            }
+        }
+    }
+
+    int count = 0;
+
+    for (int i = 0; i <= xmax; i++) {
+        for (int j = 0; j <= ymax; j++) {
+            if (grid[i][j] > 1)
+                count++;
+        }
+    }
+
+    std::cout << count << std::endl;
+
+    for (const Line* dl : dlines) {
+        if (dl->x1 <= dl->x2 && dl->y1 <= dl->y2) {
+            for (int s = 0; dl->x1+s <= dl->x2; s++) {
+                grid[dl->x1+s][dl->y1+s] += 1;
+            }
+        } else if (dl->x1 <= dl->x2 && dl->y1 >= dl->y2) {
+            for (int s = 0; dl->x1+s <= dl->x2; s++) {
+                grid[dl->x1+s][dl->y1-s] += 1;
+            }
+        }
+    }
+
+    count = 0;
+
+    for (int i = 0; i <= xmax; i++) {
+        for (int j = 0; j <= ymax; j++) {
+            if (grid[i][j] > 1)
+                count++;
+        }
+    }
+
+    std::cout << count;
+
+    for (Line* l : lines) {
+        delete l;
+    }
+
+    for (int i = 0; i <= xmax; i++) {
+        delete[] grid[i];
+    }
+
+    delete[] grid;
+
+    return 0;
 }
