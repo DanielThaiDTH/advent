@@ -15,5 +15,14 @@ include_directories (./1)
 
 #Executables
 add_executable (main main.cpp)
+
+#Compile Options
 target_compile_features (main PUBLIC cxx_std_17)
+
+if(MSVC)
+	add_compile_options(/O2)
+else()
+	add_compile_options(-O2)
+endif()
+
 
