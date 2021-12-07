@@ -3,6 +3,7 @@
 #include <deque>
 #include <vector>
 #include <map>
+#include <set>
 #include <unordered_map>
 #include <string>
 #include <cstdlib>
@@ -34,61 +35,138 @@ T& max(T& a, T& b)
         return b;
 }
 
+template<typename T>
+T min(T a, T b)
+{
+    if (a <= b)
+        return a;
+    else
+        return b;
+}
+
 static int max_day = 8;
 
-std::map<int, long long> parse(std::ifstream& f)
+std::vector<int> parse(std::ifstream& f)
 {
     char c;
     int n;
-    std::map<int, long long> fish;
+    std::vector<int> crab_pos;
 
     do {
         f >> n;
-        if (fish.find(n) != fish.end()) {
-            fish[n] += 1;
-        } else {
-            fish.insert({n, 1});
-        }
+        crab_pos.push_back(n);
     } while (f >> c);
 
-    return fish;
+    return crab_pos;
 }
 
-
-void update(std::map<int,long long>& fish)
+std::vector<int> closestTomedianOfArray(std::vector<int>& nums)
 {
-    long long refreshFish;
-    long long newFish;
+    double median = 0;
+    int closest = -1;
+    std::vector<int> candidates;
 
-    for (int i = 0; i <= max_day; i++) {
-        if (i == 0) {
-            newFish = fish[0];
-            refreshFish = fish[0];
-        } else {
-            fish[i-1] = fish[i];
-            fish[i] = 0;
-        }
+    if (nums.size() == 1) {
+        candidates.push_back(nums[0]);
+    } else if (nums.size()%2 == 0 && nums.size() > 0) {
+        size_t hi = nums.size() - 1;
+        size_t mid = hi/2;
+        candidates.push_back(nums[mid]);
+        candidates.push_back(nums[mid+1]);
+    } else if (nums.size()%2 == 1 && nums.size() > 0) {
+        candidates.push_back(nums[(nums.size()-1)/2]);
     }
 
-    fish[8] = newFish;
-    fish[6] += refreshFish;
+    return candidates;
 }
+
+int findCandidate(std::vector<int>& nums)
+{
+    int idx = 0;
+    int mean = 0;
+
+    if (nums.size() == 1) {
+        idx = 0;
+    } else if (nums.size()%2 == 0 && nums.size() > 0) {
+        size_t hi = nums.size() - 1;
+        size_t mid = hi/2;
+        idx = mid;
+    } else if (nums.size()%2 == 1 && nums.size() > 0) {
+        idx = (nums.size()-1)/2;
+    }
+
+    return idx;
+}
+
+
+int findMean(std::vector<int>& nums)
+{
+    int sum = 0;
+
+    for (int n: nums) {
+        sum += n;
+    }
+
+    double mean = sum/(double)nums.size();
+
+    if (mean - (int)mean > 0.5)
+        return (int)mean;
+    else
+        return (int)mean + 1;
+}
+
+
+int calc(int cand, std::vector<int> crabs)
+{
+    int fuel = 0;
+    for (int c : crabs) {
+        int n = std::abs(cand - c);
+        fuel += n*(n+1)/2;
+    }
+
+    return fuel;
+}
+
 
 int main()
 {
-    std::ifstream file("6/data.txt");
-    std::map<int, long long> fish = parse(file);
-    long long count = 0;
+    std::ifstream file("7/data.txt");
+    std::vector<int> crab_pos = parse(file);
+    std::sort(crab_pos.begin(), crab_pos.end());
+    
+    std::vector<int> cand = closestTomedianOfArray(crab_pos);
+    int candIdx = findCandidate(crab_pos);
+    int oldIdx = candIdx;
 
-    for (int d = 0; d < 256; d++) {
-        update(fish);
+    int res = 0;
+    int res2 = INT32_MAX;
+    if (cand.size() != 1)
+        res = min(calc(cand[0], crab_pos), calc(cand[1], crab_pos));
+    else
+        res = calc(cand[0], crab_pos);
+
+    std::cout << res << std::endl;
+
+    int fuel_prev = INT32_MAX;
+    int fuel_curr = calc(findMean(crab_pos), crab_pos);
+    int fuel_med = fuel_curr;
+    int step1 = 1, step2 = 1;
+
+    while (fuel_prev > fuel_curr) {
+        fuel_prev = fuel_curr;
+        fuel_curr = calc(crab_pos[candIdx] + step1, crab_pos);
+        step1++;
     }
 
-    for (auto& f : fish) {
-        count += f.second;
+    res2 = fuel_prev;
+
+    while (fuel_prev > fuel_curr) {
+        fuel_prev = fuel_curr;
+        fuel_curr = calc(crab_pos[candIdx] - step2, crab_pos);
+        step2++;
     }
 
-    std::cout << count;
+    std::cout << min(fuel_prev, res2) << ", " << fuel_med;
 
     return 0;
 }
