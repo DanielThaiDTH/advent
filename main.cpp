@@ -14,6 +14,8 @@
 #include <sstream>
 #include <cmath>
 
+#define NPOS std::string::npos
+
 template<typename T>
 void map(std::vector<T>& vec, std::function<bool(const T&)> f)
 {
@@ -46,200 +48,163 @@ T min(T a, T b)
 
 static int max_day = 8;
 
-std::vector<std::string> parse(std::ifstream& f)
+std::vector<int*> readL(std::ifstream& f, size_t& len)
 {
-    std::vector<std::string> lines;
+    std::vector<int*> data;
+    int* nline;
     std::string line;
-    std::string token;
-    size_t pos;
-    std::map<size_t, std::string> unique;
-    std::vector<std::string> tokens;
-    std::vector<size_t> digits;
-    char a_key, b_key, c_key, d_key,e_key, f_key, g_key;
-    size_t total = 0;
-    size_t mag = 1;
-    size_t subtotal = 0;
-    bool found = false;
 
+    std::getline(f, line);
+    size_t s = line.size();
+    nline = new int[s];
+    for (auto i = 0u; i < s; i++) {
+        if (line[i] != '\0')
+            nline[i] = line[i] - '0';
+    }
+    data.push_back(nline);
+    //std::cout << line << std:: endl;
+    
     while(std::getline(f, line)) {
-        lines.push_back(line);
-        pos = line.find_first_of('|');
-        std::istringstream outs(line.substr(pos+1));
-        std::istringstream ins(line.substr(0, pos-1));
-
-        //std::cout << line.substr(0, pos - 1) << " | " << line.substr(pos+1) << std::endl;
-
-        while (ins >> token) {
-            tokens.push_back(token);
-            switch(token.size()) {
-                case 2:
-                    unique[1] = token;
-                    break;
-                case 4:
-                    unique[4] = token;
-                    break;
-                case 3:
-                    unique[7] = token;
-                    break;
-                case 7:
-                    unique[8] = token;
-                    break;
-                default:
-                    break;
-            }
+        //std::cout << line << std:: endl;
+        nline = new int[s];
+        for (auto i = 0u; i < s; i++){
+            if (line[i] != '\0')
+                nline[i] = line[i] - '0';
         }
-
-        //find a
-        for (auto c : unique[7]) {
-            if (unique[8].find(c) != std::string::npos && unique[1].find(c) == std::string::npos) {
-                a_key = c;
-                break;
-            }
-        }
-
-        //find c and f
-        for (auto c : unique[1]) {
-            for (auto t : tokens) {
-                if (t.size() == 6) {
-                    if (t.find(c) == std::string::npos) {
-                        c_key = c;
-                        if (unique[1][0] != c) {
-                            f_key = unique[1][0];
-                        } else {
-                            f_key = unique[1][1];
-                        }
-                        found = true;
-                        break;
-                    }
-                }
-            }
-
-            if(found) break;
-        }
-        found = false;
-
-
-        //find b and d
-        for (auto c : unique[4]) {
-            if (c == c_key || c == f_key)
-                continue;
-            for (auto t : tokens) {
-                if (t.size() == 5 && t.find(f_key) == std::string::npos) {
-                    if (t.find(c) != std::string::npos) {
-                        d_key = c;
-                    } else {
-                        b_key = c;
-                    }
-                }
-            }
-        }
-
-
-        //find g
-        for (auto t : tokens) {
-            //Using 5
-            if (t.size() == 5 && t.find(b_key) != std::string::npos && 
-                                        t.find(d_key) != std::string::npos && 
-                                        t.find(f_key) != std::string::npos) {
-                for (auto c : t) {
-                    if (c != a_key && c != b_key && c != d_key && c != f_key) {
-                        g_key = c;
-                        found = true;
-                        break;
-                    }
-                }
-            }
-
-            if (found) break;
-        }
-        found = false;
-
-        for (auto t: tokens) {
-            //Using 0
-            if (t.size() == 5 && t.find(a_key) != std::string::npos && 
-                                t.find(c_key) != std::string::npos && 
-                                t.find(d_key) != std::string::npos && 
-                                t.find(g_key) != std::string::npos &&
-                                t.find(f_key) == std::string::npos) {
-                for (auto c : t) {
-                    if (c != a_key && c != c_key && c != d_key && c != g_key) {
-                        e_key = c;
-                        found = true;
-                        break;
-                    }
-                }
-            } 
-
-            if(found) break;
-        }
-        found = false;
-
-
-        while(outs >> token) {
-            switch(token.size()) {
-                case 2:
-                    digits.push_back(1);
-                    break;
-                case 4:
-                    digits.push_back(4);
-                    break;
-                case 3:
-                    digits.push_back(7);
-                    break;
-                case 5:
-                    if (token.find(e_key) != std::string::npos && token.find(g_key) != std::string::npos) {
-                        digits.push_back(2);
-                    } else if (token.find(c_key) != std::string::npos && token.find(d_key) != std::string::npos) {
-                        digits.push_back(3);
-                    } else {
-                        digits.push_back(5);
-                    }
-                    break;
-                case 6:
-                    if (token.find(c_key) != std::string::npos && token.find(e_key) != std::string::npos && token.find(f_key) != std::string::npos) {
-                        digits.push_back(0);
-                    } else if (token.find(e_key) != std::string::npos && token.find(f_key) != std::string::npos) {
-                        digits.push_back(6);
-                    } else {
-                        digits.push_back(9);
-                    }
-                    break;
-                case 7:
-                    digits.push_back(8);
-                    break;
-                default:
-                    break;
-            }
-        }
-
-
-        mag = 1;
-        subtotal = 0;
-        for (int i = 0; i < digits.size(); i++) {
-            for (int n = 0; n < digits.size() - i - 1; n++) {
-                mag *= 10;
-            }
-
-            subtotal += digits[i]*mag;
-            mag = 1;
-        }
-        //std::cout << subtotal << std::endl;
-        //std::cout << a_key << b_key << c_key << d_key << e_key << f_key << g_key << std::endl;
-
-        total += subtotal;
-        digits.clear();
-        tokens.clear();
+        data.push_back(nline);
     }
 
-    std::cout << total << std::endl;
+    len = s;
+    return data;
+}
 
-    return lines;
+struct Basin
+{
+    size_t i;
+    size_t j;
+    int val;
+};
+
+size_t length = 0;
+
+void calcBasin(const std::vector<int*>& data, size_t i, size_t j, std::vector<std::pair<int,int>>& reached)
+{
+    //int val = 1;
+    if (data[i][j] == 9)
+        return;
+
+    reached.push_back(std::pair<int, int>{i, j});
+
+    if (i > 0 && data[i][j] <= data[i-1][j] && 
+                std::none_of(reached.begin(), reached.end(), [&](auto& p){ return p == std::pair<int, int>{i-1, j}; })) {
+        calcBasin(data, i-1, j, reached);
+    }
+    
+    if (i < data.size() - 1 && data[i][j] <= data[i+1][j] && 
+                std::none_of(reached.begin(), reached.end(), [&](auto& p){ return p == std::pair<int, int>{i+1, j}; })) {
+        calcBasin(data, i+1, j, reached);
+    }
+
+    if (j > 0 && data[i][j] <= data[i][j-1] && 
+                std::none_of(reached.begin(), reached.end(), [&](auto& p){ return p == std::pair<int, int>{i, j-1}; })) {
+        calcBasin(data, i, j-1, reached);
+    }
+
+    if (j < length - 1 && data[i][j] <= data[i][j+1] &&
+                std::none_of(reached.begin(), reached.end(), [&](auto& p){ return p == std::pair<int, int>{i, j+1}; })) {
+        calcBasin(data, i, j+1, reached);
+    }
+
+    //return val;
+}
+
+size_t findBasin(std::vector<int*>& data, size_t i, size_t j)
+{
+    std::vector<std::pair<int,int>> reached;
+    calcBasin(data, i, j, reached);
+    return reached.size();
 }
 
 int main()
 {
-    std::ifstream file("8/data.txt");
-    parse(file);
+    std::ifstream file("9/big.txt");
+    size_t len;
+    std::vector<int*> data = readL(file, len);
+    length = len;
+    std::vector<Basin> basins;
+    bool lowest = true;
+    int risk = 0;
+
+    for (auto i = 0u; i < data.size(); i++) {
+        for (auto j = 0u; j < len; j++) {
+            lowest = true;
+            if (data[i][j] == 9)
+                lowest = false;
+
+            if (lowest && i > 0) {
+                lowest = !(data[i][j] >= data[i-1][j]);
+            }
+            
+            if (lowest && i < data.size() - 1) {
+                lowest = !(data[i][j] >= data[i+1][j]);
+            }
+
+            if (lowest && j > 0) {
+                lowest = !(data[i][j] >= data[i][j-1]);
+            }
+
+            if (lowest && j < len - 1) {
+                lowest = !(data[i][j] >= data[i][j+1]);
+            }
+
+            if (lowest) {
+                risk += 1 + data[i][j];
+                Basin b;
+                b.i = i;
+                b.j = j;
+                b.val = data[i][j];
+                basins.push_back(b);
+            }
+
+            //std::cout << data[i][j];
+        }
+        //std::cout << std::endl;
+    }
+
+    std::cout << risk << std::endl << std::endl;
+
+    std::sort(basins.begin(), basins.end(), [](Basin& a, Basin& b){ return a.val < b.val; });
+    std::vector<size_t> basinsizes;
+
+    for (Basin& b : basins) {
+        //std::cout << "finding on basin " << b.val << std::endl;
+        size_t val = findBasin(data, b.i, b.j);
+        if (basinsizes.size() < 3) {
+            basinsizes.push_back(val);
+            if (basinsizes.size() == 3) {
+                std::sort(basinsizes.begin(), basinsizes.end(), [](size_t a, size_t b){ return a < b; });
+            }
+        } else {
+            if (val > basinsizes[0] && val < basinsizes[1])
+                basinsizes[0] = val;
+            else if (val >= basinsizes[1]) {
+                basinsizes[0] = val;
+                std::sort(basinsizes.begin(), basinsizes.end(), [](size_t a, size_t b){ return a < b; });
+            }
+        }
+    }
+
+    std::sort(basinsizes.begin(), basinsizes.end(), [](size_t a, size_t b){ return a > b; });
+
+    int count = 0;
+    size_t product = 1;
+    for (auto bs : basinsizes) {
+        product *= bs;
+        count++;
+        if (count == 3) break;
+    }
+
+    std::cout << product;
 
     return 0;
 }
