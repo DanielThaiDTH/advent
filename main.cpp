@@ -1,210 +1,268 @@
-#include <iostream>
-#include <fstream>
+#include "utils.h"
+#include <algorithm>
+#include <climits>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <deque>
-#include <vector>
+#include <fstream>
+#include <functional>
+#include <iostream>
 #include <map>
 #include <set>
-#include <unordered_map>
-#include <string>
-#include <cstdlib>
-#include <climits>
-#include <cstdio>
-#include <algorithm>
-#include <functional>
 #include <sstream>
-#include <cmath>
+#include <stack>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 #define NPOS std::string::npos
 
-template<typename T>
-void map(std::vector<T>& vec, std::function<bool(const T&)> f)
-{
-    for (auto it = vec.begin(), it != vec.end();) {
-        if (!f(*it)) {
-            vec.erase();
-        } else {
-            ++it;
-        }
+template <typename T>
+void filter(std::vector<T> &vec, std::function<bool(const T &)> f) {
+  for (auto it = vec.begin(); it != vec.end();) {
+    if (!f(*it)) {
+      vec.erase();
+    } else {
+      ++it;
     }
+  }
 }
 
-template<typename T>
-T& max(T& a, T& b)
-{
-    if (a >= b)
-        return a;
-    else
-        return b;
+template <typename T> T &max(T &a, T &b) {
+  if (a >= b)
+    return a;
+  else
+    return b;
 }
 
-template<typename T>
-T min(T a, T b)
-{
-    if (a <= b)
-        return a;
-    else
-        return b;
+template <typename T> T min(T a, T b) {
+  if (a <= b)
+    return a;
+  else
+    return b;
 }
 
-static int max_day = 8;
+std::vector<short *> parse(std::ifstream &f, size_t &len) {
+  std::vector<short *> data;
+  short *nline;
+  std::string line;
 
-std::vector<int*> readL(std::ifstream& f, size_t& len)
-{
-    std::vector<int*> data;
-    int* nline;
-    std::string line;
+  std::getline(f, line);
+  size_t s = line.size();
+  nline = new short[s];
+  for (auto i = 0u; i < s; i++) {
+    if (line[i] != '\0')
+      nline[i] = line[i] - '0';
+  }
+  data.push_back(nline);
+  // std::cout << line << std:: endl;
 
-    std::getline(f, line);
-    size_t s = line.size();
-    nline = new int[s];
+  while (std::getline(f, line)) {
+    // std::cout << line << std:: endl;
+    nline = new short[s];
     for (auto i = 0u; i < s; i++) {
-        if (line[i] != '\0')
-            nline[i] = line[i] - '0';
+      if (line[i] != '\0')
+        nline[i] = line[i] - '0';
     }
     data.push_back(nline);
-    //std::cout << line << std:: endl;
-    
-    while(std::getline(f, line)) {
-        //std::cout << line << std:: endl;
-        nline = new int[s];
-        for (auto i = 0u; i < s; i++){
-            if (line[i] != '\0')
-                nline[i] = line[i] - '0';
-        }
-        data.push_back(nline);
-    }
+  }
 
-    len = s;
-    return data;
+  len = s;
+  return data;
 }
 
-struct Basin
-{
-    size_t i;
-    size_t j;
-    int val;
-};
-
-size_t length = 0;
-
-void calcBasin(const std::vector<int*>& data, size_t i, size_t j, std::vector<std::pair<int,int>>& reached)
-{
-    //int val = 1;
-    if (data[i][j] == 9)
-        return;
-
-    reached.push_back(std::pair<int, int>{i, j});
-
-    if (i > 0 && data[i][j] <= data[i-1][j] && 
-                std::none_of(reached.begin(), reached.end(), [&](auto& p){ return p == std::pair<int, int>{i-1, j}; })) {
-        calcBasin(data, i-1, j, reached);
+void increaseEnergy(std::vector<short *> &data, size_t len,
+                    std::stack<std::pair<int, int>> &coords) {
+  for (int i = 0; i < data.size(); i++) {
+    for (int j = 0; j < len; j++) {
+      ++data[i][j];
+      if (data[i][j] == 10)
+        coords.push({i, j});
     }
-    
-    if (i < data.size() - 1 && data[i][j] <= data[i+1][j] && 
-                std::none_of(reached.begin(), reached.end(), [&](auto& p){ return p == std::pair<int, int>{i+1, j}; })) {
-        calcBasin(data, i+1, j, reached);
-    }
-
-    if (j > 0 && data[i][j] <= data[i][j-1] && 
-                std::none_of(reached.begin(), reached.end(), [&](auto& p){ return p == std::pair<int, int>{i, j-1}; })) {
-        calcBasin(data, i, j-1, reached);
-    }
-
-    if (j < length - 1 && data[i][j] <= data[i][j+1] &&
-                std::none_of(reached.begin(), reached.end(), [&](auto& p){ return p == std::pair<int, int>{i, j+1}; })) {
-        calcBasin(data, i, j+1, reached);
-    }
-
-    //return val;
+  }
 }
 
-size_t findBasin(std::vector<int*>& data, size_t i, size_t j)
-{
-    std::vector<std::pair<int,int>> reached;
-    calcBasin(data, i, j, reached);
-    return reached.size();
+void print(const std::vector<short *> &data, size_t len) {
+  for (int i = 0; i < data.size(); i++) {
+    for (int j = 0; j < len; j++) {
+      std::cout << (data[i][j]<10?" ":"") << data[i][j] << ' ';
+    }
+
+    std::cout << std::endl;
+  }
+
+  std::cout << std::endl;
 }
 
-int main()
-{
-    std::ifstream file("9/big.txt");
-    size_t len;
-    std::vector<int*> data = readL(file, len);
-    length = len;
-    std::vector<Basin> basins;
-    bool lowest = true;
-    int risk = 0;
 
-    for (auto i = 0u; i < data.size(); i++) {
-        for (auto j = 0u; j < len; j++) {
-            lowest = true;
-            if (data[i][j] == 9)
-                lowest = false;
+void explode(std::vector<short *> &data, size_t len,
+             std::stack<std::pair<int, int>> &coords, size_t &count) {
+    int i, j;
+    auto addIfNotZero = [](short& d){ 
+        if (d != 0) ++d;
+     };
+  while (coords.size() > 0) {
+    count++;
+    auto p = coords.top();
+    i = p.first;
+    j = p.second;
+    data[i][j] = 0;
+    coords.pop();
 
-            if (lowest && i > 0) {
-                lowest = !(data[i][j] >= data[i-1][j]);
-            }
-            
-            if (lowest && i < data.size() - 1) {
-                lowest = !(data[i][j] >= data[i+1][j]);
-            }
+    if (i > 0) {
+      addIfNotZero(data[i - 1][j]);
+      if (data[i - 1][j] == 10)
+        coords.push({i - 1, j});
 
-            if (lowest && j > 0) {
-                lowest = !(data[i][j] >= data[i][j-1]);
-            }
+      if (j > 0) {
+        addIfNotZero(data[i - 1][j - 1]);
+        if (data[i - 1][j - 1] == 10)
+          coords.push({i - 1, j - 1});
+      }
 
-            if (lowest && j < len - 1) {
-                lowest = !(data[i][j] >= data[i][j+1]);
-            }
-
-            if (lowest) {
-                risk += 1 + data[i][j];
-                Basin b;
-                b.i = i;
-                b.j = j;
-                b.val = data[i][j];
-                basins.push_back(b);
-            }
-
-            //std::cout << data[i][j];
-        }
-        //std::cout << std::endl;
+      if (j < len - 1) {
+        addIfNotZero(data[i - 1][j + 1]);
+        if (data[i - 1][j + 1] == 10)
+          coords.push({i - 1, j + 1});
+      }
     }
 
-    std::cout << risk << std::endl << std::endl;
+    if (i < data.size() - 1) {
+      addIfNotZero(data[i + 1][j]);
+      if (data[i + 1][j] == 10)
+        coords.push({i + 1, j});
 
-    std::sort(basins.begin(), basins.end(), [](Basin& a, Basin& b){ return a.val < b.val; });
-    std::vector<size_t> basinsizes;
+      if (j > 0) {
+        addIfNotZero(data[i + 1][j - 1]);
+        if (data[i + 1][j - 1] == 10)
+          coords.push({i + 1, j - 1});
+      }
 
-    for (Basin& b : basins) {
-        //std::cout << "finding on basin " << b.val << std::endl;
-        size_t val = findBasin(data, b.i, b.j);
-        if (basinsizes.size() < 3) {
-            basinsizes.push_back(val);
-            if (basinsizes.size() == 3) {
-                std::sort(basinsizes.begin(), basinsizes.end(), [](size_t a, size_t b){ return a < b; });
-            }
-        } else {
-            if (val > basinsizes[0] && val < basinsizes[1])
-                basinsizes[0] = val;
-            else if (val >= basinsizes[1]) {
-                basinsizes[0] = val;
-                std::sort(basinsizes.begin(), basinsizes.end(), [](size_t a, size_t b){ return a < b; });
-            }
-        }
+      if (j < len - 1) {
+        addIfNotZero(data[i + 1][j + 1]);
+        if (data[i + 1][j + 1] == 10)
+          coords.push({i + 1, j + 1});
+      }
     }
 
-    std::sort(basinsizes.begin(), basinsizes.end(), [](size_t a, size_t b){ return a > b; });
-
-    int count = 0;
-    size_t product = 1;
-    for (auto bs : basinsizes) {
-        product *= bs;
-        count++;
-        if (count == 3) break;
+    if (j > 0) {
+      addIfNotZero(data[i][j - 1]);
+      if (data[i][j - 1] == 10)
+        coords.push({i, j - 1});
     }
 
-    std::cout << product;
+    if (j < len - 1) {
+      addIfNotZero(data[i][j + 1]);
+      if (data[i][j + 1] == 10)
+        coords.push({i, j + 1});
+    }
+  }
+}
 
-    return 0;
+void explodeSync(std::vector<short *> &data, size_t len,
+             std::stack<std::pair<int, int>> &coords, bool &allExp, size_t& dataSize) {
+  int i, j;
+  auto addIfNotZero = [](short &d) {
+    if (d != 0)
+      ++d;
+  };
+
+  size_t explodeCount = 0;
+
+  while (coords.size() > 0) {
+
+    auto p = coords.top();
+    i = p.first;
+    j = p.second;
+    data[i][j] = 0;
+    coords.pop();
+    explodeCount++;
+
+    if (i > 0) {
+      addIfNotZero(data[i - 1][j]);
+      if (data[i - 1][j] == 10)
+        coords.push({i - 1, j});
+
+      if (j > 0) {
+        addIfNotZero(data[i - 1][j - 1]);
+        if (data[i - 1][j - 1] == 10)
+          coords.push({i - 1, j - 1});
+      }
+
+      if (j < len - 1) {
+        addIfNotZero(data[i - 1][j + 1]);
+        if (data[i - 1][j + 1] == 10)
+          coords.push({i - 1, j + 1});
+      }
+    }
+
+    if (i < data.size() - 1) {
+      addIfNotZero(data[i + 1][j]);
+      if (data[i + 1][j] == 10)
+        coords.push({i + 1, j});
+
+      if (j > 0) {
+        addIfNotZero(data[i + 1][j - 1]);
+        if (data[i + 1][j - 1] == 10)
+          coords.push({i + 1, j - 1});
+      }
+
+      if (j < len - 1) {
+        addIfNotZero(data[i + 1][j + 1]);
+        if (data[i + 1][j + 1] == 10)
+          coords.push({i + 1, j + 1});
+      }
+    }
+
+    if (j > 0) {
+      addIfNotZero(data[i][j - 1]);
+      if (data[i][j - 1] == 10)
+        coords.push({i, j - 1});
+    }
+
+    if (j < len - 1) {
+      addIfNotZero(data[i][j + 1]);
+      if (data[i][j + 1] == 10)
+        coords.push({i, j + 1});
+    }
+  }
+
+  if (explodeCount == dataSize) {
+    allExp = true;
+    print(data, len);
+    return;
+  }
+}
+
+int main() {
+  std::ifstream file("11/data.txt");
+  size_t len = 0;
+  char c;
+  size_t explodeCount = 0;
+  std::stack<std::pair<int, int>> explodeCoords;
+  std::vector<short *> data = parse(file, len);
+  size_t dataSize = len*data.size();
+
+  int count = 0;
+  std::cout << len << std::endl;
+  print(data, len);
+
+//   for (auto i = 0; i < count; i++) {
+//     increaseEnergy(data, len, explodeCoords);
+//     explode(data, len, explodeCoords, explodeCount);
+//     //print(data, len);
+//     //std::cin >> c;
+//   }
+
+//   std::cout << explodeCount;
+
+    bool allExp = false;
+    while (!allExp) {
+      increaseEnergy(data, len, explodeCoords);
+      explodeSync(data, len, explodeCoords, allExp, dataSize);
+      count++;
+    }
+
+    std::cout << count;
 }
