@@ -207,11 +207,10 @@ int main() {
   std::vector<std::vector<Node*>> visitedPaths;
   std::vector<Node*> currentPath;
   std::stack<size_t> neighbour_idxs;
-  bool foundPath = false;
   size_t count = 0;
 
   Node* curr = find(nodes, "start");
-  printSet(nodes);
+  //printSet(nodes);
 
   do {
     if (currentPath.size() == 0 || curr != currentPath.back()) {
@@ -222,29 +221,28 @@ int main() {
         count++;
         currentPath.back()->visited--;
         currentPath.pop_back();
+        neighbour_idxs.pop();
         curr = currentPath.back();
+        if (neighbour_idxs.top() < curr->neighbours.size() - 1) {
+          neighbour_idxs.top()++;
+        }
       }
     }
 
     Node* n = curr->neighbours[neighbour_idxs.top()];
 
-    for (Node* n : curr->neighbours) {
-      if (!inPath(currentPath, n) && n->name != "start"
+    if (!inPath(currentPath, n) && n->name != "start"
           && visitedPathCheck(visitedPaths, currentPath, n) 
           && notIsolated(curr, n) ) {
-        curr = n;
-        if (!curr->isBig) {
-          curr->visited++;
-          if (curr->visited >= 2)
-            visited = 2;
-        }
-        foundPath = true;
+      curr = n;
+      if (!curr->isBig) {
+        curr->visited++;
+        if (curr->visited >= 2)
+          visited = 2;
       }
-
-      if (foundPath) break;
-    }
-
-    if (!foundPath) {
+    } else if (neighbour_idxs.top() < curr->neighbours.size() - 1) {
+      neighbour_idxs.top()++;
+    } else {
       visitedPaths.push_back(currentPath);
       if (!currentPath.back()->isBig) {
         currentPath.back()->visited--;
@@ -252,11 +250,16 @@ int main() {
           visited = 0;
       }
       currentPath.pop_back();
-      if (currentPath.size() > 0)
+      neighbour_idxs.pop();
+      if (currentPath.size() > 0) {
         curr = currentPath.back();
+        if (neighbour_idxs.top() < curr->neighbours.size() - 1) {
+          neighbour_idxs.top()++;
+        }
+      }
     }
 
-    foundPath = false;
+    //std::cout << neighbour_idxs.top() << ", " << curr->neighbours.size() << std::endl;
     
   } while(currentPath.size() > 0);
 
