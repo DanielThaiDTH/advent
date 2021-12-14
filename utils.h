@@ -5,6 +5,8 @@
 #define UTILS_H
 
 #include <cstddef>
+#include <vector>
+#include <functional>
 
 template<typename T>
 class Stack
@@ -112,5 +114,41 @@ template<typename T>
 size_t Stack<T>::size() const
 {
     return _size;
+}
+
+template <typename T>
+void filter(std::vector<T> &vec, std::function<bool(const T &)> f) {
+  for (auto it = vec.begin(); it != vec.end();) {
+    if (!f(*it)) {
+      vec.erase();
+    } else {
+      ++it;
+    }
+  }
+}
+
+template <typename T> T &max(T &a, T &b) {
+  if (a >= b)
+    return a;
+  else
+    return b;
+}
+
+template <typename T> T min(T a, T b) {
+  if (a <= b)
+    return a;
+  else
+    return b;
+}
+
+template<typename T>
+void deepCopy(std::vector<T*>& a, std::vector<T*>& b, size_t len)
+{
+    for (auto l : a) {
+        b.push_back(new T[len]);
+        for (auto j = 0u; j < len; j++) {
+            b.back()[j] = l[j];
+        }
+    }
 }
 #endif
