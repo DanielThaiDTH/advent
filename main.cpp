@@ -45,28 +45,6 @@ void printMap(const std::map<char, uint64_t>& map) {
   std::cout << std::endl;
 }
 
-void fold(std::pair<char, int> foldLine, std::set<std::pair<int, int>>& points) {
-  std::vector<std::pair<int, int>> foldedPoints;
-  std::cout << "Folding on " << foldLine.first << " at " << foldLine.second << std::endl;
-
-  for (auto it = points.begin(); it != points.end();) {
-    //std::cout << "testing point (" << it->first << ", " << it->second << ")\n";
-    if (foldLine.first == 'x' && it->first > foldLine.second) {
-      foldedPoints.push_back({foldLine.second - (it->first - foldLine.second), it->second});
-      it = points.erase(it);
-    } else if(foldLine.first == 'y' && it->second > foldLine.second) {
-      foldedPoints.push_back({it->first, foldLine.second - (it->second - foldLine.second)});
-      it = points.erase(it);
-    } else {
-      ++it;   
-    }
-  }
-
-  for (auto& p : foldedPoints) {
-    points.insert(p);
-  }
-}
-
 
 std::map<std::pair<char, char>, char> parse(std::ifstream& f, std::string& temp, std::map<char, uint64_t>& letters) {
   std::map<std::pair<char, char>, char> rules;
@@ -116,12 +94,12 @@ int main() {
   }
 
   printMap(letters);
-  count++;
+  //count++;
 
   //Start
   uint64_t cnt;
   char newLetter;
-  for (; count < 41; count++) {
+  for (; count < 40; count++) {
     for (auto& pc : pairCount) {
       cnt = pc.second;
       if (cnt > 0) {
