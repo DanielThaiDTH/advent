@@ -5,15 +5,49 @@
 #include <cstdio>
 #include <cstdlib>
 #include <deque>
+#include <fstream>
+#include <iostream>
 #include <map>
 #include <set>
 #include <sstream>
 #include <stack>
+#include <string>
 #include <unordered_map>
 #include <vector>
 #include <cctype>
 
 #define NPOS std::string::npos
+
+int visited = 0;
+
+std::vector<short *> parseBlock(std::ifstream &f, size_t &len) {
+  std::vector<short *> data;
+  short *nline;
+  std::string line;
+
+  std::getline(f, line);
+  size_t s = line.size();
+  nline = new short[s];
+  for (auto i = 0u; i < s; i++) {
+    if (line[i] != '\0')
+      nline[i] = line[i] - '0';
+  }
+  data.push_back(nline);
+  // std::cout << line << std:: endl;
+
+  while (std::getline(f, line)) {
+    // std::cout << line << std:: endl;
+    nline = new short[s];
+    for (auto i = 0u; i < s; i++) {
+      if (line[i] != '\0')
+        nline[i] = line[i] - '0';
+    }
+    data.push_back(nline);
+  }
+
+  len = s;
+  return data;
+}
 
 void printSet(const std::set<std::pair<int, int>> set) {
   for (auto p : set) {

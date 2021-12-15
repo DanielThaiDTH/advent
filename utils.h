@@ -7,6 +7,10 @@
 #include <cstddef>
 #include <vector>
 #include <functional>
+#include <string>
+#include <cstdio>
+#include <iostream>
+#include <fstream>
 
 template<typename T>
 class Stack
@@ -150,5 +154,32 @@ void deepCopy(std::vector<T*>& a, std::vector<T*>& b, size_t len)
             b.back()[j] = l[j];
         }
     }
+}
+
+std::vector<short *> parseBlock(std::ifstream &f, size_t &len) {
+  std::vector<short *> data;
+  short *nline;
+  std::string line;
+
+  std::getline(f, line);
+  size_t s = line.size();
+  nline = new short[s];
+  for (auto i = 0u; i < s; i++) {
+    if (line[i] != '\0')
+      nline[i] = line[i] - '0';
+  }
+  data.push_back(nline);
+
+  while (std::getline(f, line)) {
+    nline = new short[s];
+    for (auto i = 0u; i < s; i++) {
+      if (line[i] != '\0')
+        nline[i] = line[i] - '0';
+    }
+    data.push_back(nline);
+  }
+
+  len = s;
+  return data;
 }
 #endif
