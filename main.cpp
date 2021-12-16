@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <deque>
+#include <queue>
 #include <map>
 #include <set>
 #include <sstream>
@@ -45,89 +46,177 @@ void printMap(const std::map<char, uint64_t>& map) {
   std::cout << std::endl;
 }
 
+struct Vertex {
+  Vertex* prev;
+  size_t cost;
+  std::pair<int, int> location;
+  Vertex(std::pair<int, int> loc) {
+    cost = UINT_MAX;
+    prev = nullptr;
+    location = loc;
+  }
+};
 
-std::map<std::pair<char, char>, char> parse(std::ifstream& f, std::string& temp, std::map<char, uint64_t>& letters) {
-  std::map<std::pair<char, char>, char> rules;
-  std::string line;
-  char a, b, c;
+class vertexComp {
+public:
+  bool operator()(Vertex* a, Vertex* b) {
+    return b->cost < a->cost;
+  }
+};
 
-  std::getline(f, temp);
 
-  std::getline(f, line);
+Vertex* getVertex(int i, int j, std::map<std::pair<int, int>, Vertex*>& visited) {
+  Vertex* v = nullptr;
 
-  while(std::getline(f, line)) {
-    sscanf_s(line.c_str(), "%c%c %*s %c", &a, 1, &b, 1, &c, 1);
-    rules.insert({{a, b}, c});
-    letters.insert({c, 0});
+  if (visited.find({i, j}) != visited.end()) {
+    v = visited.find({i, j})->second;
+  } else {
+    v = new Vertex({i, j});
+    visited.insert({{i, j}, v});
   }
 
-  return rules;
+  return v;
+}
+
+
+void setCost(Vertex* src, Vertex* dst, const std::vector<short*>& riskMap) {
+
+  if (dst->prev == src)
+    return;
+
+  size_t additionalCost = riskMap[dst->location.first][dst->location.second];
+
+  if (src->cost + additionalCost < dst->cost) {
+    dst->cost = src->cost + additionalCost;
+    dst->prev = src;
+  }
+}
+
+void setCost(Vertex* src, Vertex* dst, const std::vector<short*>& riskMap, size_t len) {
+  if (dst->prev == src)
+    return;
+
+  size_t calc = (riskMap[dst->location.first%riskMap.size()][dst->location.second%len] 
+                          + dst->location.first/riskMap.size() + dst->location.second/len);
+  size_t additionalCost = (calc)%10 + ((calc > 9)? 1 : 0);
+
+  if (src->cost + additionalCost < dst->cost) {
+    dst->cost = src->cost + additionalCost;
+    dst->prev = src;
+  }
+}
+
+size_t getCost(Vertex* end) {
+
+  return 0;
 }
 
 int main() {
-  std::ifstream file("14/data.txt");
-  std::string temp;
-  std::map<char, uint64_t> letters;
-  std::map<std::pair<char, char>, char> rules = parse(file, temp, letters);
-  std::map<std::pair<char, char>, uint64_t> pairCount;
-  std::map<std::pair<char, char>, uint64_t> nextInc;
-  int count = 0;
+  std::ifstream file("15/data.txt");
+  size_t len;
+  std::vector<short*> riskMap = parseBlock(file, len);
+  std::map<std::pair<int, int>, Vertex*> visited;
+  std::priority_queue<Vertex*, std::vector<Vertex*>, vertexComp> q;
 
-  for (const auto& p : rules) {
-    pairCount.insert({p.first, 0});
-    nextInc.insert({p.first, 0});
-  }
-  
-  //printMap(rules);
+  Vertex* initial = new Vertex({0, 0});
+  initial->cost = 0;
+  q.push(initial);
 
-  //Initialize
-  for (auto i = 0u; i < temp.size() - 1; i++) {
-    auto pair = std::pair<char, char>{temp.at(i), temp.at(i+1)};
-    auto p_cnt = pairCount.find(pair);
-    p_cnt->second += 1;
+  Vertex* v;
+  Vertex* adj;
 
-    letters.find(temp.at(i))->second += 1;
-    if (i + 2 == temp.size())
-      letters.find(temp.at(i+1))->second += 1;
-    
-    //letters.find(rules.find(pair)->second)->second += 1;
-  }
-
-  printMap(letters);
-  //count++;
-
-  //Start
-  uint64_t cnt;
-  char newLetter;
-  for (; count < 40; count++) {
-    for (auto& pc : pairCount) {
-      cnt = pc.second;
-      if (cnt > 0) {
-        newLetter = rules.find(pc.first)->second;
-        nextInc.find({pc.first.first, newLetter})->second += cnt;
-        nextInc.find({newLetter, pc.first.second})->second += cnt;
-        letters.find(newLetter)->second += cnt;
-        pc.second = 0;
+  auto update = [&](Vertex* v, Vertex* adj) { 
+      if (adj->cost == UINT_MAX) {
+        setCost(v, adj, riskMap);
+        q.push(adj);
+      } else {
+        setCost(v, adj, riskMap);
       }
-    }
+  };
+
+  while (q.size() > 0) {
+    v = q.top();
+    q.pop();
     
-    for (auto& inc : nextInc) {
-      pairCount.find(inc.first)->second += inc.second;
-      inc.second = 0;
+    //Check adjacent
+    if ((size_t)v->location.first < riskMap.size() - 1) {
+      adj = getVertex(v->location.first + 1, v->location.second, visited);
+      update(v, adj);
+    }
+
+    if (v->location.first > 0) {
+      adj = getVertex(v->location.first - 1, v->location.second, visited);
+      update(v, adj);
+    }
+
+    if ((size_t)v->location.second < len - 1) {
+      adj = getVertex(v->location.first, v->location.second + 1, visited);
+      update(v, adj);
+    }
+
+    if (v->location.second > 0) {
+      adj = getVertex(v->location.first, v->location.second - 1, visited);
+      update(v, adj);
     }
   }
 
-  //printMap(letters);
-  //printMap(pairCount);
-  uint64_t min = ULLONG_MAX;
-  uint64_t max = 0;
+  Vertex* end = visited.find({riskMap.size() - 1, len - 1})->second;
 
-  for (auto& lc : letters) {
-    if (lc.second < min) min = lc.second;
-    if (lc.second > max) max = lc.second;
+  std::cout << "1. " << end->cost << std::endl;
+
+  for (auto& p : visited) {
+    delete p.second;
   }
 
-  std::cout << max - min;
+  visited.clear();
+
+
+  //Part 2
+  size_t maxRow = riskMap.size()*5;
+  size_t maxCol = len*5;
+
+  initial = new Vertex({0, 0});
+  initial->cost = 0;
+  q.push(initial);
+
+  auto update2 = [&](Vertex* v, Vertex* adj) { 
+      if (adj->cost == UINT_MAX) {
+        setCost(v, adj, riskMap, len);
+        q.push(adj);
+      } else {
+        setCost(v, adj, riskMap, len);
+      }
+  };
+
+  while (q.size() > 0) {
+    v = q.top();
+    q.pop();
+    
+    //Check adjacent
+    if ((size_t)v->location.first < maxRow - 1) {
+      adj = getVertex(v->location.first + 1, v->location.second, visited);
+      update2(v, adj);
+    }
+
+    if (v->location.first > 0) {
+      adj = getVertex(v->location.first - 1, v->location.second, visited);
+      update2(v, adj);
+    }
+
+    if ((size_t)v->location.second < maxCol - 1) {
+      adj = getVertex(v->location.first, v->location.second + 1, visited);
+      update2(v, adj);
+    }
+
+    if (v->location.second > 0) {
+      adj = getVertex(v->location.first, v->location.second - 1, visited);
+      update2(v, adj);
+    }
+  }
+
+  end = visited.find({maxRow - 1, maxCol - 1})->second;
+
+  std::cout << "2. " << end->cost << std::endl;
 
   return 0;
 }
