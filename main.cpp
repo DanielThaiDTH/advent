@@ -98,7 +98,7 @@ enum ParseState {
 struct Packet {
   short version;
   PacketType type;
-  size_t value;
+  uint64_t value;
   size_t length;
   std::vector<Packet*> subpackets;
 };
@@ -161,24 +161,24 @@ size_t versionSum(Packet* p) {
 }
 
 
-size_t eval(Packet* p) {
+uint64_t eval(Packet* p) {
   if (p->type == LITERAL) {
     return p->value;
   } else if (p->type == SUM) {
-    size_t val = 0;
+    uint64_t val = 0;
     for (auto sp : p->subpackets) {
       val += eval(sp);
     }
     return val;
   } else if (p->type == PRODUCT) {
-    size_t val = 1;
+    uint64_t val = 1;
     for (auto sp : p->subpackets) {
       val *= eval(sp);
     }
     return val;
   } else if (p->type == MIN) {
-    size_t min = UINT_MAX;
-    size_t subval;
+    uint64_t min = UINT_LEAST64_MAX;
+    uint64_t subval;
     for (auto sp : p->subpackets) {
       subval = eval(sp);
       if (subval < min)
@@ -186,8 +186,8 @@ size_t eval(Packet* p) {
     }
     return min;
   } else if (p->type == MAX) {
-    size_t max = 0;
-    size_t subval;
+    uint64_t max = 0;
+    uint64_t subval;
     for (auto sp : p->subpackets) {
       subval = eval(sp);
       if (subval > max)
@@ -246,7 +246,7 @@ Packet* parsePacket(const std::vector<bool>& bin, size_t& pos, ParseState state 
     newPacket->value = 0;
     for (auto i = (int)binaryValue.size() - 1; i >= 0; --i) {
       //std::cout << newPacket->value << " value prev, i = " << i << "\n";
-      newPacket->value += (size_t)binaryValue[i] << (binaryValue.size() - 1 - i);
+      newPacket->value += (uint64_t)binaryValue[i] << (binaryValue.size() - 1 - i);
       //std::cout << newPacket->value << " value updated, i = " << i << "\n";
     }
   } else {
