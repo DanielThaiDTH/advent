@@ -46,172 +46,249 @@ void printMap(const std::map<char, uint64_t>& map) {
   std::cout << std::endl;
 }
 
-struct Vertex {
-  Vertex* prev;
-  size_t cost;
-  std::pair<int, int> location;
-  Vertex(std::pair<int, int> loc) {
-    cost = UINT_MAX;
-    prev = nullptr;
-    location = loc;
-  }
+enum PacketType {
+  SUM = 0,
+  PRODUCT = 1,
+  MIN = 2,
+  MAX = 3,
+  LITERAL = 4,
+  GT = 5,
+  LT = 6,
+  EQ = 7
 };
 
-class vertexComp {
-public:
-  bool operator()(Vertex* a, Vertex* b) {
-    return b->cost < a->cost;
+std::ostream& operator<<(std::ostream& out, PacketType type) {
+  switch (type) {
+    case SUM:
+      out << "SUM";
+      break;
+    case PRODUCT:
+      out << "PRODUCT";
+      break;
+    case MIN:
+      out << "MIN";
+      break;
+    case MAX:
+      out << "MAX";
+      break;
+    case LITERAL:
+      out << "Literal";
+      break;
+    case GT:
+      out << "Greater than";
+      break;
+    case LT:
+      out << "Less than";
+      break;
+    case EQ:
+      out << "Equal";
+      break;
   }
+
+  return out;
+}
+
+
+enum ParseState {
+  HEADER,
+  VALUE
 };
 
 
-Vertex* getVertex(int i, int j, std::map<std::pair<int, int>, Vertex*>& visited) {
-  Vertex* v = nullptr;
+struct Packet {
+  short version;
+  PacketType type;
+  size_t value;
+  size_t length;
+  std::vector<Packet*> subpackets;
+};
 
-  if (visited.find({i, j}) != visited.end()) {
-    v = visited.find({i, j})->second;
+
+std::vector<bool> parse(std::ifstream& f) {
+  std::map<char, std::vector<bool>> hexToBool;
+  hexToBool.insert({'0', {0, 0, 0, 0}}); 
+  hexToBool.insert({'1', {0, 0, 0, 1}});
+  hexToBool.insert({'2', {0, 0, 1, 0}});
+  hexToBool.insert({'3', {0, 0, 1, 1}});
+  hexToBool.insert({'4', {0, 1, 0, 0}});
+  hexToBool.insert({'5', {0, 1, 0, 1}}); 
+  hexToBool.insert({'6', {0, 1, 1, 0}});
+  hexToBool.insert({'7', {0, 1, 1, 1}});
+  hexToBool.insert({'8', {1, 0, 0, 0}});
+  hexToBool.insert({'9', {1, 0, 0, 1}});
+  hexToBool.insert({'A', {1, 0, 1, 0}});
+  hexToBool.insert({'B', {1, 0, 1, 1}});
+  hexToBool.insert({'C', {1, 1, 0, 0}});
+  hexToBool.insert({'D', {1, 1, 0, 1}});
+  hexToBool.insert({'E', {1, 1, 1, 0}});
+  hexToBool.insert({'F', {1, 1, 1, 1}});
+
+  std::vector<bool> bin;
+  std::string line;
+  std::getline(f, line);
+
+  for (const auto& c : line) {
+    for (bool b : hexToBool.find(c)->second) {
+      bin.push_back(b);
+    }
+  }
+
+  return bin;
+}
+
+
+size_t fromBinary(const std::vector<bool>& bin, size_t& pos, size_t count) {
+  size_t num = 0;
+
+  for (auto i = count + pos - 1; i >= pos; i--) {
+    num += (size_t)bin[i] << (count + pos - 1 - i);
+  }
+
+  pos += count;
+
+  return num;
+}
+
+
+size_t versionSum(Packet* p) {
+  size_t val = p->version;
+
+  for (auto sp : p->subpackets) {
+    val += versionSum(sp);
+  }
+
+  return val;
+}
+
+
+size_t eval(Packet* p) {
+  if (p->type == LITERAL) {
+    return p->value;
+  } else if (p->type == SUM) {
+    size_t val = 0;
+    for (auto sp : p->subpackets) {
+      val += eval(sp);
+    }
+    return val;
+  } else if (p->type == PRODUCT) {
+    size_t val = 1;
+    for (auto sp : p->subpackets) {
+      val *= eval(sp);
+    }
+    return val;
+  } else if (p->type == MIN) {
+    size_t min = UINT_MAX;
+    size_t subval;
+    for (auto sp : p->subpackets) {
+      subval = eval(sp);
+      if (subval < min)
+        min = subval;
+    }
+    return min;
+  } else if (p->type == MAX) {
+    size_t max = 0;
+    size_t subval;
+    for (auto sp : p->subpackets) {
+      subval = eval(sp);
+      if (subval > max)
+        max = subval;
+    }
+    return max;
+  } else if (p->type == GT) {
+    return eval(p->subpackets[0]) > eval(p->subpackets[1]);
+  } else if (p->type == LT) {
+    return eval(p->subpackets[0]) < eval(p->subpackets[1]);
+  } else if (p->type == EQ) {
+    return eval(p->subpackets[0]) == eval(p->subpackets[1]);
   } else {
-    v = new Vertex({i, j});
-    visited.insert({{i, j}, v});
+    std::cout << "Unknown path reached\n";
+    return 0;
   }
 
-  return v;
 }
 
 
-void setCost(Vertex* src, Vertex* dst, const std::vector<short*>& riskMap) {
+Packet* parsePacket(const std::vector<bool>& bin, size_t& pos, ParseState state = HEADER) {
+  Packet* newPacket = new Packet();
+  newPacket->version = ((short)bin[pos] << 2) + ((short)bin[pos+1] << 1) + (short)bin[pos+2];
+  // std::cout << "version " << newPacket->version << ", ";
+  pos += 3;
+  newPacket->type = static_cast<PacketType>(static_cast<short>(bin[pos] << 2) 
+                                            + (static_cast<short>(bin[pos+1]) << 1) 
+                                            + static_cast<short>(bin[pos+2]));
+  pos += 3;
 
-  if (dst->prev == src)
-    return;
+  //std::cout << "type " << newPacket->type << "\n";
 
-  size_t additionalCost = riskMap[dst->location.first][dst->location.second];
+  if (newPacket->type == LITERAL) {
+    bool cont = bin[pos];
+    std::vector<bool> binaryValue;
+    pos++;
 
-  if (src->cost + additionalCost < dst->cost) {
-    dst->cost = src->cost + additionalCost;
-    dst->prev = src;
+    while (cont) {
+      binaryValue.push_back(bin[pos]);
+      binaryValue.push_back(bin[pos+1]);
+      binaryValue.push_back(bin[pos+2]);
+      binaryValue.push_back(bin[pos+3]);
+      pos += 4;
+
+      cont = bin[pos];
+      pos++;
+    }
+
+    //end
+    binaryValue.push_back(bin[pos]);
+    binaryValue.push_back(bin[pos+1]);
+    binaryValue.push_back(bin[pos+2]);
+    binaryValue.push_back(bin[pos+3]);
+    pos += 4;
+
+    newPacket->value = 0;
+    for (auto i = (int)binaryValue.size() - 1; i >= 0; --i) {
+      //std::cout << newPacket->value << " value prev, i = " << i << "\n";
+      newPacket->value += (size_t)binaryValue[i] << (binaryValue.size() - 1 - i);
+      //std::cout << newPacket->value << " value updated, i = " << i << "\n";
+    }
+  } else {
+    bool isBinSize = !bin[pos];
+    pos++;
+    if(isBinSize) {
+      size_t length = fromBinary(bin, pos, 15);
+      size_t origPos = pos;
+      while (pos <= origPos + length && (origPos + length - pos) > 9) {
+        //std::cout << pos << " " << origPos << " " << origPos + length << "\n";
+        newPacket->subpackets.push_back(parsePacket(bin, pos));
+      }
+    } else {
+      size_t packetCount = fromBinary(bin, pos, 11);
+      for (auto i = 0u; i < packetCount; i++) {
+        newPacket->subpackets.push_back(parsePacket(bin, pos));
+      }
+    }
   }
-}
 
-void setCost(Vertex* src, Vertex* dst, const std::vector<short*>& riskMap, size_t len) {
-  if (dst->prev == src)
-    return;
-
-  size_t calc = (riskMap[dst->location.first%riskMap.size()][dst->location.second%len] 
-                          + dst->location.first/riskMap.size() + dst->location.second/len);
-  size_t additionalCost = (calc)%10 + ((calc > 9)? 1 : 0);
-
-  if (src->cost + additionalCost < dst->cost) {
-    dst->cost = src->cost + additionalCost;
-    dst->prev = src;
-  }
+  return newPacket;
 }
 
 int main() {
-  std::ifstream file("15/data.txt");
-  size_t len;
-  std::vector<short*> riskMap = parseBlock(file, len);
-  std::map<std::pair<int, int>, Vertex*> visited;
-  std::priority_queue<Vertex*, std::vector<Vertex*>, vertexComp> q;
+  std::ifstream file("16/data.txt");
+  std::vector<bool> bin = parse(file);
+  size_t pos = 0;
 
-  Vertex* initial = new Vertex({0, 0});
-  initial->cost = 0;
-  q.push(initial);
+  // for (bool b : bin) {
+  //   if (b)
+  //     std::cout << "1";
+  //   else
+  //     std::cout << "0";
+  // }
+  std::cout << std::endl;
 
-  Vertex* v;
-  Vertex* adj;
+  Packet* p = parsePacket(bin, pos);
 
-  auto update = [&](Vertex* v, Vertex* adj) { 
-      if (adj->cost == UINT_MAX) {
-        setCost(v, adj, riskMap);
-        q.push(adj);
-      } else {
-        setCost(v, adj, riskMap);
-      }
-  };
+  std::cout << "Parsed\n";
 
-  while (q.size() > 0) {
-    v = q.top();
-    q.pop();
-    
-    //Check adjacent
-    if ((size_t)v->location.first < riskMap.size() - 1) {
-      adj = getVertex(v->location.first + 1, v->location.second, visited);
-      update(v, adj);
-    }
-
-    if (v->location.first > 0) {
-      adj = getVertex(v->location.first - 1, v->location.second, visited);
-      update(v, adj);
-    }
-
-    if ((size_t)v->location.second < len - 1) {
-      adj = getVertex(v->location.first, v->location.second + 1, visited);
-      update(v, adj);
-    }
-
-    if (v->location.second > 0) {
-      adj = getVertex(v->location.first, v->location.second - 1, visited);
-      update(v, adj);
-    }
-  }
-
-  Vertex* end = visited.find({riskMap.size() - 1, len - 1})->second;
-
-  std::cout << "1. " << end->cost << std::endl;
-
-  for (auto& p : visited) {
-    delete p.second;
-  }
-
-  visited.clear();
-
-
-  //Part 2
-  size_t maxRow = riskMap.size()*5;
-  size_t maxCol = len*5;
-
-  initial = new Vertex({0, 0});
-  initial->cost = 0;
-  q.push(initial);
-
-  auto update2 = [&](Vertex* v, Vertex* adj) { 
-      if (adj->cost == UINT_MAX) {
-        setCost(v, adj, riskMap, len);
-        q.push(adj);
-      } else {
-        setCost(v, adj, riskMap, len);
-      }
-  };
-
-  while (q.size() > 0) {
-    v = q.top();
-    q.pop();
-    
-    //Check adjacent
-    if ((size_t)v->location.first < maxRow - 1) {
-      adj = getVertex(v->location.first + 1, v->location.second, visited);
-      update2(v, adj);
-    }
-
-    if (v->location.first > 0) {
-      adj = getVertex(v->location.first - 1, v->location.second, visited);
-      update2(v, adj);
-    }
-
-    if ((size_t)v->location.second < maxCol - 1) {
-      adj = getVertex(v->location.first, v->location.second + 1, visited);
-      update2(v, adj);
-    }
-
-    if (v->location.second > 0) {
-      adj = getVertex(v->location.first, v->location.second - 1, visited);
-      update2(v, adj);
-    }
-  }
-
-  end = visited.find({maxRow - 1, maxCol - 1})->second;
-
-  std::cout << "2. " << end->cost << std::endl;
+  std::cout << versionSum(p) << std::endl;
+  std::cout << eval(p);
 
   return 0;
 }
