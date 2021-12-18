@@ -270,162 +270,25 @@ Packet* parsePacket(const std::vector<bool>& bin, size_t& pos, ParseState state 
   return newPacket;
 }
 
-double quadratic(int d0, int target, bool isAdd = true) {
-  double sqrtPart = (d0 + 0.5)*(d0 + 0.5) - 2*target;
-  if (sqrtPart < 0) {
-    return -1;
-  } else {
-    sqrtPart = sqrt(sqrtPart);
-  }
-
-  if (isAdd) {
-    //Ignore postive root, -1 in denominator cancesl out
-    return (d0 + 0.5) + sqrtPart;
-
-  } else {
-    return (d0 + 0.5) - sqrtPart;
-  }
-}
-
-bool checkInt(double val) { 
-  double round = rint(val);
-  double epi = 0.0001;
-  return val >= 0 && fabs(val - round) < epi;
-}
-
-//Start must be less than end
-bool checkRange(int start, int end, int d0, int& steps) {
-  bool found = false;
-  double temp;
-
-  if (start > end) {
-    std::cout << "start must be less than end\n";
-    exit(0);
-  }
-
-  for (int i = end; i >= start && !found; i--) {
-    temp = quadratic(d0, i);
-    found = checkInt(temp);
-    if (found)
-      steps = (int)temp;
-    else
-      steps = -1;
-  }
-
-  return found;
-}
-
-bool checkRangeX(int start, int end, int dx0, int& steps) {
-  int t_max = dx0 + 1;
-  int x_max = t_max*dx0 + t_max - t_max*(t_max + 1)/2;
-  bool found = false;
-  bool inRange = x_max <= end;
-  double temp;
-
-  if (start > end) {
-    std::cout << "start must be less than end\n";
-    exit(0);
-  }
-
-  if (x_max < start) return false;
-
-  x_max = min(end, x_max);
-
-  for (int i = start; i <= x_max && !found; i++) {
-    temp = quadratic(dx0, i, false);
-    found = checkInt(temp);
-    if (found)
-      steps = (int)temp;
-    else
-      steps = -1;
-  }
-
-  if (inRange)
-    steps = INT_MAX;
-
-  return found;
-}
-
-
-bool testSteps(int dx0, int dy0, int minsteps, int xstart, int xend, int ystart, int yend) {
-  bool yinRange = true;
-  bool xinRange = true;
-  bool found = false;
-  int steps = 1;
-  int x = 0, y = 0, dx;
-
-  while (!found) {
-
-    y = steps*dy0 + steps - steps*(steps+1)/2;
-
-    if (steps-1 <= dx0) {
-      dx = dx0 - steps + 1;
-    } else {
-      dx = 0;
-    }
-
-    x += dx;
-
-    if (y > yend) {
-      yinRange = false;
-    } else if (y <= yend && y >= ystart) {
-      yinRange = true;
-    } else if (y < ystart) {
-      break;
-    }
-
-    if (x > xend) {
-      break;
-    } else if (x <= xend && x >= xstart) {
-      xinRange = true;
-    } else if (x < xstart) {
-      xinRange = false;
-    }
-
-    steps++;
-    found = yinRange && xinRange;
-  }
-
-  return found;
-}
-
-
 int main() {
-  //std::ifstream file("16/data.txt");
-  
-  int t_max, dy0 = -1000, dx0 = 0, y_max, ysteps, xsteps, ymaxv, yminv = INT_MAX, hmax;
-  auto getY = [](int dy, int t) -> int{ return t*dy + t - t*(t+1)/2; };
-  
+  std::ifstream file("16/data.txt");
+  std::vector<bool> bin = parse(file);
+  size_t pos = 0;
 
-  for (; dy0 < 500; dy0++) {
-    t_max = dy0 + 1;
-    y_max = getY(dy0, t_max);
-    if (checkRange(-98, -73, dy0, ysteps)) {
-      // std::cout << t_max << " steps for height " <<  y_max << " with inital of "  << dy0 
-      //           << " : " << "has solution at steps " << ysteps << std::endl;
-      if (yminv == INT_MAX) yminv = dy0;
-      hmax = y_max;
-      ymaxv = dy0;
-    }
-  }
-  
-  std::cout << hmax << std::endl;
-  dy0 = yminv;
-  dx0 = 0;
+  // for (bool b : bin) {
+  //   if (b)
+  //     std::cout << "1";
+  //   else
+  //     std::cout << "0";
+  // }
   std::cout << std::endl;
 
-  int count = 0;
-  for (; dy0 <= ymaxv; dy0++) {
-    for (; dx0 < 172; dx0++) {
-        if (testSteps(dx0, dy0, ysteps, 137, 171, -98, -73)) {
-          //std::cout << ysteps << ": "<<  dx0 << ", " << dy0 << std::endl;
-          count++;
-        }
-    }
-    dx0 = 0;
-  }
+  Packet* p = parsePacket(bin, pos);
 
-  std::cout << count;
+  std::cout << "Parsed\n";
+
+  std::cout << versionSum(p) << std::endl;
+  std::cout << eval(p);
 
   return 0;
 }
