@@ -32,400 +32,381 @@ void printMap(const std::map<std::pair<char, char>, char>& map) {
   std::cout << std::endl;
 }
 
-void printMap(const std::map<std::pair<char, char>, uint64_t>& map) {
-  for (auto p : map) {
-    std::cout << "{ {" << p.first.first << ", " << p.first.second << "}, " << p.second << "}" << std::endl;
-  }
-  std::cout << std::endl;
-}
-
-void printMap(const std::map<char, uint64_t>& map) {
-  for (auto p : map) {
-    std::cout << "{" << p.first << ", " << p.second << "}" << std::endl;
-  }
-  std::cout << std::endl;
-}
-
-enum PacketType {
-  SUM = 0,
-  PRODUCT = 1,
-  MIN = 2,
-  MAX = 3,
-  LITERAL = 4,
-  GT = 5,
-  LT = 6,
-  EQ = 7
-};
-
-std::ostream& operator<<(std::ostream& out, PacketType type) {
-  switch (type) {
-    case SUM:
-      out << "SUM";
-      break;
-    case PRODUCT:
-      out << "PRODUCT";
-      break;
-    case MIN:
-      out << "MIN";
-      break;
-    case MAX:
-      out << "MAX";
-      break;
-    case LITERAL:
-      out << "Literal";
-      break;
-    case GT:
-      out << "Greater than";
-      break;
-    case LT:
-      out << "Less than";
-      break;
-    case EQ:
-      out << "Equal";
-      break;
-  }
-
-  return out;
-}
-
 
 enum ParseState {
-  HEADER,
-  VALUE
+  LEFT,
+  RIGHT
 };
 
+struct SnailNum {
+  bool leftIsValue = true;
+  bool rightIsValue = true;
+  short left;
+  short right;
+  SnailNum* leftNum;
+  SnailNum* rightNum;
+  SnailNum* parent;
+  short height = 0;
 
-struct Packet {
-  short version;
-  PacketType type;
-  uint64_t value;
-  size_t length;
-  std::vector<Packet*> subpackets;
+  SnailNum(SnailNum* parent = nullptr) {
+    this->parent = parent;
+  }
+  
+  void print() {
+    std::cout << "[";
+    if (!leftIsValue) {
+      leftNum->print();
+    } else {
+      std::cout << left;
+    }
+    std::cout << ",";
+    if (!rightIsValue) {
+      rightNum->print();
+    } else {
+      std::cout << right;
+    }
+    std::cout << "]";
+  }
+
+  short calcHeight() {
+    short h = 1;
+    short h1 = (leftIsValue)? 0 : leftNum->calcHeight();
+    short h2 = (rightIsValue)? 0 : rightNum->calcHeight();
+
+    height = h + max(h1, h2);
+    return height;
+  }
+
+  size_t mag() {
+    size_t l_val = (leftIsValue)? 3*left : 3*leftNum->mag();
+    size_t r_val = (rightIsValue)? 2*right : 2*rightNum->mag();
+
+    return l_val + r_val;
+  }
 };
 
+SnailNum* deepCopy(const SnailNum* src) {
+  SnailNum* copy = new SnailNum();
 
-std::vector<bool> parse(std::ifstream& f) {
-  std::map<char, std::vector<bool>> hexToBool;
-  hexToBool.insert({'0', {0, 0, 0, 0}}); 
-  hexToBool.insert({'1', {0, 0, 0, 1}});
-  hexToBool.insert({'2', {0, 0, 1, 0}});
-  hexToBool.insert({'3', {0, 0, 1, 1}});
-  hexToBool.insert({'4', {0, 1, 0, 0}});
-  hexToBool.insert({'5', {0, 1, 0, 1}}); 
-  hexToBool.insert({'6', {0, 1, 1, 0}});
-  hexToBool.insert({'7', {0, 1, 1, 1}});
-  hexToBool.insert({'8', {1, 0, 0, 0}});
-  hexToBool.insert({'9', {1, 0, 0, 1}});
-  hexToBool.insert({'A', {1, 0, 1, 0}});
-  hexToBool.insert({'B', {1, 0, 1, 1}});
-  hexToBool.insert({'C', {1, 1, 0, 0}});
-  hexToBool.insert({'D', {1, 1, 0, 1}});
-  hexToBool.insert({'E', {1, 1, 1, 0}});
-  hexToBool.insert({'F', {1, 1, 1, 1}});
+  copy->leftIsValue = src->leftIsValue;
+  copy->rightIsValue = src->rightIsValue;
+  copy->left = src->left;
+  copy->right = src->right;
+  if (!copy->leftIsValue) {
+    copy->leftNum = deepCopy(src->leftNum);
+    copy->leftNum->parent = copy;
+  }
+  if (!copy->rightIsValue) {
+    copy->rightNum = deepCopy(src->rightNum);
+    copy->rightNum->parent = copy;
+  }
 
-  std::vector<bool> bin;
+  return copy;
+}
+
+bool split(SnailNum* root) {
+  std::set<SnailNum*> visited;
+  SnailNum* curr;
+  bool splitted = false;
+  int depth = 1;
+
+  curr = root;
+
+  while (!splitted && curr) {
+    visited.insert(curr);
+    if (!curr->leftIsValue && visited.find(curr->leftNum) == visited.end()) {
+      curr = curr->leftNum;
+      depth++;
+    } else if (curr->leftIsValue && curr->left >= 10) {
+      curr->leftIsValue = false;
+      curr->leftNum = new SnailNum(curr);
+      curr->leftNum->left = curr->left/2;
+      curr->leftNum->right = (curr->left+1)/2;
+      curr->left = 0;
+      visited.insert(curr->leftNum);
+      splitted = true;
+    } else if (!curr->rightIsValue && visited.find(curr->rightNum) == visited.end()) {
+      curr = curr->rightNum;
+      depth++;
+    }else if (curr->rightIsValue && curr->right >= 10) {
+      curr->rightIsValue = false;
+      curr->rightNum = new SnailNum(curr);
+      curr->rightNum->left = curr->right/2;
+      curr->rightNum->right = (curr->right+1)/2;
+      curr->right = 0;
+      visited.insert(curr->rightNum);
+      splitted = true;
+    } else {
+      curr = curr->parent;
+      depth--;
+    }
+  }
+
+
+  return splitted;
+}
+
+bool splittable(SnailNum* root) {
+  std::set<SnailNum*> visited;
+  SnailNum* curr;
+  bool found = false;
+
+  curr = root;
+
+  while (curr && !found) {
+    visited.insert(curr);
+    if (!curr->leftIsValue && visited.find(curr->leftNum) == visited.end()) {
+      curr = curr->leftNum;
+    } else if (!curr->rightIsValue && visited.find(curr->rightNum) == visited.end()) {
+      curr = curr->rightNum;
+    } else if (curr->leftIsValue && curr->left >= 10) {
+      found = true;
+    } else if (curr->rightIsValue && curr->right >= 10) {
+      found = true;
+    } else {
+      curr = curr->parent;
+    }
+  }
+
+  return found;
+}
+
+bool explode(SnailNum* root) {
+  short depth = 1;
+  short carryLeft = -1, carryRight = -1;
+  std::set<SnailNum*> visited;
+  SnailNum* curr;
+  SnailNum* nav;
+  SnailNum* prevNav;
+  SnailNum* temp;
+  bool exploded = false;
+
+  curr = root;
+  while (!exploded && curr && depth > 0) {
+    visited.insert(curr);
+    
+    if (!curr->leftIsValue && visited.find(curr->leftNum) == visited.end()) {
+      depth++;
+      curr = curr->leftNum;
+    } else if (!curr->rightIsValue && visited.find(curr->rightNum) == visited.end()) {
+      depth++;
+      curr = curr->rightNum;
+    } else if (curr->rightIsValue && curr->leftIsValue) {
+      if (depth > 4) {
+        carryRight = curr->right;
+        carryLeft = curr->left;
+        
+        ///Carry left
+        nav = curr->parent;
+        prevNav = curr;
+        while (nav && carryLeft != -1) {
+          if (nav->leftIsValue) {
+            nav->left += carryLeft;
+            carryLeft = -1;  
+          } else {
+            temp = nav->leftNum;
+            if (prevNav != temp) {
+              while (!temp->rightIsValue) {
+                temp = temp->rightNum;
+              }
+              temp->right += carryLeft;
+              carryLeft = -1;
+            }
+          }
+
+          prevNav = nav;
+          nav = nav->parent;
+        }
+
+        ///Carry right
+        nav = curr->parent;
+        prevNav = curr;
+        while (nav && carryRight != -1) {
+          if (nav->rightIsValue) {
+            nav->right += carryRight;
+            carryRight = -1;  
+          } else {
+            temp = nav->rightNum;
+            if (prevNav != temp) {
+              while (!temp->leftIsValue) {
+                temp = temp->leftNum;
+              }
+              temp->left += carryRight;
+              carryRight = -1;
+            }
+          }
+          prevNav = nav;
+          nav = nav->parent;
+        }
+
+
+        nav = curr->parent;
+        if (curr == nav->leftNum) {
+          nav->leftNum = nullptr;
+          nav->left = 0;
+          nav->leftIsValue = true;
+        } else {
+          nav->rightNum = nullptr;
+          nav->right = 0;
+          nav->rightIsValue = true;
+        }
+        //delete curr;
+
+
+        exploded = true;
+        curr = nav;
+        carryRight = -1;
+        carryLeft = -1;
+      } else {
+        curr = curr->parent;
+      }
+      depth--;
+    } else {
+      curr = curr->parent;
+      depth--;
+    }
+
+  }
+
+  return exploded;
+}
+
+
+SnailNum* add(SnailNum* a, SnailNum* b) {
+  SnailNum* sum = new SnailNum();
+  bool splitWatch = true;
+  bool explodeWatch = true;
+
+  sum->leftIsValue = false;
+  sum->rightIsValue = false;
+
+  a->parent = sum;
+  b->parent = sum;
+
+  sum->leftNum = a;
+  sum->rightNum = b;
+
+  short h = sum->calcHeight();
+  explodeWatch = sum->calcHeight() > 4;
+  splitWatch = splittable(sum);
+
+  while (explodeWatch || splitWatch) {
+    if (explodeWatch && explode(sum)) {
+      explodeWatch = sum->calcHeight() > 4;
+      splitWatch = splittable(sum);
+    } else if (splitWatch && split(sum)) {
+      explodeWatch = sum->calcHeight() > 4;
+      splitWatch = splittable(sum);
+    }
+  }
+
+  return sum;
+}
+
+
+std::vector<SnailNum*> parse(std::ifstream& f) {
+  SnailNum* activeNum = nullptr;
+  SnailNum* rootNum = nullptr;
+  std::stack<SnailNum*> currNum;
+  std::vector<SnailNum*> nums;
   std::string line;
-  std::getline(f, line);
+  ParseState state = LEFT;
 
-  for (const auto& c : line) {
-    for (bool b : hexToBool.find(c)->second) {
-      bin.push_back(b);
-    }
-  }
-
-  return bin;
-}
-
-
-size_t fromBinary(const std::vector<bool>& bin, size_t& pos, size_t count) {
-  size_t num = 0;
-
-  for (auto i = count + pos - 1; i >= pos; i--) {
-    num += (size_t)bin[i] << (count + pos - 1 - i);
-  }
-
-  pos += count;
-
-  return num;
-}
-
-
-size_t versionSum(Packet* p) {
-  size_t val = p->version;
-
-  for (auto sp : p->subpackets) {
-    val += versionSum(sp);
-  }
-
-  return val;
-}
-
-
-uint64_t eval(Packet* p) {
-  if (p->type == LITERAL) {
-    return p->value;
-  } else if (p->type == SUM) {
-    uint64_t val = 0;
-    for (auto sp : p->subpackets) {
-      val += eval(sp);
-    }
-    return val;
-  } else if (p->type == PRODUCT) {
-    uint64_t val = 1;
-    for (auto sp : p->subpackets) {
-      val *= eval(sp);
-    }
-    return val;
-  } else if (p->type == MIN) {
-    uint64_t min = UINT_LEAST64_MAX;
-    uint64_t subval;
-    for (auto sp : p->subpackets) {
-      subval = eval(sp);
-      if (subval < min)
-        min = subval;
-    }
-    return min;
-  } else if (p->type == MAX) {
-    uint64_t max = 0;
-    uint64_t subval;
-    for (auto sp : p->subpackets) {
-      subval = eval(sp);
-      if (subval > max)
-        max = subval;
-    }
-    return max;
-  } else if (p->type == GT) {
-    return eval(p->subpackets[0]) > eval(p->subpackets[1]);
-  } else if (p->type == LT) {
-    return eval(p->subpackets[0]) < eval(p->subpackets[1]);
-  } else if (p->type == EQ) {
-    return eval(p->subpackets[0]) == eval(p->subpackets[1]);
-  } else {
-    std::cout << "Unknown path reached\n";
-    return 0;
-  }
-
-}
-
-
-Packet* parsePacket(const std::vector<bool>& bin, size_t& pos, ParseState state = HEADER) {
-  Packet* newPacket = new Packet();
-  newPacket->version = ((short)bin[pos] << 2) + ((short)bin[pos+1] << 1) + (short)bin[pos+2];
-  // std::cout << "version " << newPacket->version << ", ";
-  pos += 3;
-  newPacket->type = static_cast<PacketType>(static_cast<short>(bin[pos] << 2) 
-                                            + (static_cast<short>(bin[pos+1]) << 1) 
-                                            + static_cast<short>(bin[pos+2]));
-  pos += 3;
-
-  //std::cout << "type " << newPacket->type << "\n";
-
-  if (newPacket->type == LITERAL) {
-    bool cont = bin[pos];
-    std::vector<bool> binaryValue;
-    pos++;
-
-    while (cont) {
-      binaryValue.push_back(bin[pos]);
-      binaryValue.push_back(bin[pos+1]);
-      binaryValue.push_back(bin[pos+2]);
-      binaryValue.push_back(bin[pos+3]);
-      pos += 4;
-
-      cont = bin[pos];
-      pos++;
-    }
-
-    //end
-    binaryValue.push_back(bin[pos]);
-    binaryValue.push_back(bin[pos+1]);
-    binaryValue.push_back(bin[pos+2]);
-    binaryValue.push_back(bin[pos+3]);
-    pos += 4;
-
-    newPacket->value = 0;
-    for (auto i = (int)binaryValue.size() - 1; i >= 0; --i) {
-      //std::cout << newPacket->value << " value prev, i = " << i << "\n";
-      newPacket->value += (uint64_t)binaryValue[i] << (binaryValue.size() - 1 - i);
-      //std::cout << newPacket->value << " value updated, i = " << i << "\n";
-    }
-  } else {
-    bool isBinSize = !bin[pos];
-    pos++;
-    if(isBinSize) {
-      size_t length = fromBinary(bin, pos, 15);
-      size_t origPos = pos;
-      while (pos <= origPos + length && (origPos + length - pos) > 9) {
-        //std::cout << pos << " " << origPos << " " << origPos + length << "\n";
-        newPacket->subpackets.push_back(parsePacket(bin, pos));
-      }
-    } else {
-      size_t packetCount = fromBinary(bin, pos, 11);
-      for (auto i = 0u; i < packetCount; i++) {
-        newPacket->subpackets.push_back(parsePacket(bin, pos));
+  while (std::getline(f, line)) {
+    for (const auto& c : line) {
+      if (c == '[') {
+        if (currNum.size() == 0)
+          activeNum = new SnailNum();
+        else
+          activeNum = new SnailNum(currNum.top());
+        if (currNum.size() > 0 && state == LEFT) {
+          currNum.top()->leftIsValue = false;
+          currNum.top()->leftNum = activeNum;
+        } else if (currNum.size() > 0 && state == RIGHT) {
+          currNum.top()->rightIsValue = false;
+          currNum.top()->rightNum = activeNum;
+        }
+        currNum.push(activeNum);
+        state = LEFT;
+      } else if (c == ',') {
+        state = RIGHT;
+      } else if (c == ']') {
+        if (currNum.size() == 1)
+          rootNum = currNum.top();
+        currNum.pop();
+      } else {
+        if (state == LEFT) {
+          currNum.top()->leftIsValue = true;
+          currNum.top()->left = (short)(c - '0');
+        } else if (state == RIGHT) {
+          currNum.top()->rightIsValue = true;
+          currNum.top()->right = (short)(c - '0');
+        }
       }
     }
+    rootNum->calcHeight();
+    nums.push_back(rootNum);
   }
-
-  return newPacket;
-}
-
-double quadratic(int d0, int target, bool isAdd = true) {
-  double sqrtPart = (d0 + 0.5)*(d0 + 0.5) - 2*target;
-  if (sqrtPart < 0) {
-    return -1;
-  } else {
-    sqrtPart = sqrt(sqrtPart);
-  }
-
-  if (isAdd) {
-    //Ignore postive root, -1 in denominator cancesl out
-    return (d0 + 0.5) + sqrtPart;
-
-  } else {
-    return (d0 + 0.5) - sqrtPart;
-  }
-}
-
-bool checkInt(double val) { 
-  double round = rint(val);
-  double epi = 0.0001;
-  return val >= 0 && fabs(val - round) < epi;
-}
-
-//Start must be less than end
-bool checkRange(int start, int end, int d0, int& steps) {
-  bool found = false;
-  double temp;
-
-  if (start > end) {
-    std::cout << "start must be less than end\n";
-    exit(0);
-  }
-
-  for (int i = end; i >= start && !found; i--) {
-    temp = quadratic(d0, i);
-    found = checkInt(temp);
-    if (found)
-      steps = (int)temp;
-    else
-      steps = -1;
-  }
-
-  return found;
-}
-
-bool checkRangeX(int start, int end, int dx0, int& steps) {
-  int t_max = dx0 + 1;
-  int x_max = t_max*dx0 + t_max - t_max*(t_max + 1)/2;
-  bool found = false;
-  bool inRange = x_max <= end;
-  double temp;
-
-  if (start > end) {
-    std::cout << "start must be less than end\n";
-    exit(0);
-  }
-
-  if (x_max < start) return false;
-
-  x_max = min(end, x_max);
-
-  for (int i = start; i <= x_max && !found; i++) {
-    temp = quadratic(dx0, i, false);
-    found = checkInt(temp);
-    if (found)
-      steps = (int)temp;
-    else
-      steps = -1;
-  }
-
-  if (inRange)
-    steps = INT_MAX;
-
-  return found;
+  
+  return nums;
 }
 
 
-bool testSteps(int dx0, int dy0, int minsteps, int xstart, int xend, int ystart, int yend) {
-  bool yinRange = true;
-  bool xinRange = true;
-  bool found = false;
-  int steps = 1;
-  int x = 0, y = 0, dx;
-
-  while (!found) {
-
-    y = steps*dy0 + steps - steps*(steps+1)/2;
-
-    if (steps-1 <= dx0) {
-      dx = dx0 - steps + 1;
-    } else {
-      dx = 0;
-    }
-
-    x += dx;
-
-    if (y > yend) {
-      yinRange = false;
-    } else if (y <= yend && y >= ystart) {
-      yinRange = true;
-    } else if (y < ystart) {
-      break;
-    }
-
-    if (x > xend) {
-      break;
-    } else if (x <= xend && x >= xstart) {
-      xinRange = true;
-    } else if (x < xstart) {
-      xinRange = false;
-    }
-
-    steps++;
-    found = yinRange && xinRange;
+void clear(SnailNum* root) {
+  std::deque<SnailNum*> q;
+  q.push_back(root);
+  while (q.size() > 0) {
+    SnailNum* del = q.front();
+    q.pop_front();
+    if (!del->leftIsValue)
+      q.push_back(del->leftNum);
+    if (!del->rightIsValue)
+      q.push_back(del->rightNum);
+    delete del;
   }
-
-  return found;
 }
 
 
 int main() {
-  //std::ifstream file("16/data.txt");
-  
-  int t_max, dy0 = -1000, dx0 = 0, y_max, ysteps, xsteps, ymaxv, yminv = INT_MAX, hmax;
-  auto getY = [](int dy, int t) -> int{ return t*dy + t - t*(t+1)/2; };
-  
+  std::ifstream file("18/data.txt");
+  std::vector<SnailNum*> numbers = parse(file);
 
-  for (; dy0 < 500; dy0++) {
-    t_max = dy0 + 1;
-    y_max = getY(dy0, t_max);
-    if (checkRange(-98, -73, dy0, ysteps)) {
-      // std::cout << t_max << " steps for height " <<  y_max << " with inital of "  << dy0 
-      //           << " : " << "has solution at steps " << ysteps << std::endl;
-      if (yminv == INT_MAX) yminv = dy0;
-      hmax = y_max;
-      ymaxv = dy0;
-    }
-  }
-  
-  std::cout << hmax << std::endl;
-  dy0 = yminv;
-  dx0 = 0;
-  std::cout << std::endl;
+  if (numbers.size() > 1) {
+    //Part 1
 
-  int count = 0;
-  for (; dy0 <= ymaxv; dy0++) {
-    for (; dx0 < 172; dx0++) {
-        if (testSteps(dx0, dy0, ysteps, 137, 171, -98, -73)) {
-          //std::cout << ysteps << ": "<<  dx0 << ", " << dy0 << std::endl;
-          count++;
+    // SnailNum* num = add(numbers[0], numbers[1]);
+    // for (auto i = 2u; i < numbers.size(); i++) {
+    //   num = add(num, numbers[i]);
+    // }
+
+    // std::cout << num->mag();
+
+    //clear(num);
+
+
+    //Part 2
+    size_t max = 0;
+    size_t mag;
+    SnailNum* temp;
+
+    for (auto i = 0u; i < numbers.size(); i++) {
+      for (auto j = 0u; j < numbers.size(); j++) {
+        if (i != j) {
+          temp = add(deepCopy(numbers[i]), deepCopy(numbers[j]));
+          mag = temp->mag();
+          if (mag > max) {
+            max = mag;
+          } 
+            
         }
+      }
     }
-    dx0 = 0;
-  }
 
-  std::cout << count;
+    std::cout << max;
+
+    
+    std::cout << std::endl;
+  }
 
   return 0;
 }
