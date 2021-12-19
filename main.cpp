@@ -374,35 +374,34 @@ int main() {
   if (numbers.size() > 1) {
     //Part 1
 
-    // SnailNum* num = add(numbers[0], numbers[1]);
-    // for (auto i = 2u; i < numbers.size(); i++) {
-    //   num = add(num, numbers[i]);
-    // }
+    SnailNum* num = add(numbers[0], numbers[1]);
+    for (auto i = 2u; i < numbers.size(); i++) {
+      num = add(num, numbers[i]);
+    }
 
-    // std::cout << num->mag();
+    std::cout << num->mag();
 
-    //clear(num);
+    clear(num);
 
 
     //Part 2
-    size_t max = 0;
-    size_t mag;
-    SnailNum* temp;
+    // size_t max = 0;
+    // size_t mag;
+    // SnailNum* temp;
 
-    for (auto i = 0u; i < numbers.size(); i++) {
-      for (auto j = 0u; j < numbers.size(); j++) {
-        if (i != j) {
-          temp = add(deepCopy(numbers[i]), deepCopy(numbers[j]));
-          mag = temp->mag();
-          if (mag > max) {
-            max = mag;
-          } 
+    // for (auto i = 0u; i < numbers.size(); i++) {
+    //   for (auto j = 0u; j < numbers.size(); j++) {
+    //     if (i != j) {
+    //       temp = add(deepCopy(numbers[i]), deepCopy(numbers[j]));
+    //       mag = temp->mag();
+    //       if (mag > max) {
+    //         max = mag;
+    //       } 
             
-        }
-      }
-    }
-
-    std::cout << max;
+    //     }
+    //   }
+    // }
+    // std::cout << max;
 
     
     std::cout << std::endl;
