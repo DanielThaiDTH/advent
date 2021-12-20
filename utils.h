@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <vector>
+#include <algorithm>
 #include <functional>
 #include <string>
 #include <cstdio>
@@ -145,6 +146,7 @@ template <typename T> T min(T a, T b) {
     return b;
 }
 
+///Deepcopies two vectors
 template<typename T>
 void deepCopy(std::vector<T*>& a, std::vector<T*>& b, size_t len)
 {
@@ -156,6 +158,7 @@ void deepCopy(std::vector<T*>& a, std::vector<T*>& b, size_t len)
     }
 }
 
+///Parses a number block
 std::vector<short *> parseBlock(std::ifstream &f, size_t &len) {
   std::vector<short *> data;
   short *nline;
@@ -181,5 +184,244 @@ std::vector<short *> parseBlock(std::ifstream &f, size_t &len) {
 
   len = s;
   return data;
+}
+
+
+enum Rotation {
+  ROT_0,
+  ROT_90,
+  ROT_180,
+  ROT_270
+};
+
+
+struct Coord {
+  int x;
+  int y;
+  int z;
+
+  Coord(int a, int b, int c) {
+    x = a;
+    y = b;
+    z = c;
+  }
+
+  void set(int a, int b, int c) {
+    x = a;
+    y = b;
+    z = c;
+  }
+
+  void print() const {
+    std::cout << "(" << x << ", " << y << ", " << z << ")";
+  }
+
+  bool operator==(const Coord& rhs) const {
+    return x == rhs.x && y == rhs.y && z == rhs.z;
+  }
+
+  bool operator<(const Coord& rhs) const {
+    if (x != rhs.x)
+      return x < rhs.x;
+
+    if (y != rhs.y)
+      return y < rhs.y;
+
+    return x < rhs.z;
+    //return (abs(x) + abs(y) + abs(z)) < (abs(rhs.x) + abs(rhs.y) + abs(rhs.z));
+  }
+};
+
+
+struct Matrix {
+  int mat[3][3] = {0};
+  bool operator==(const Matrix& rhs) {
+    bool equal = true;
+    for (int i = 0; i < 3 && equal; i++) {
+      for (int j = 0; j < 3 && equal; j++) {
+        equal = this->mat[i][j] == rhs.mat[i][j];
+      }
+    }
+
+    return equal;
+  }
+};
+
+Matrix operator*(const Matrix& lhs, const Matrix& rhs) {
+  Matrix result;
+
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      result.mat[i][j] = lhs.mat[i][0]*rhs.mat[0][j] + lhs.mat[i][1]*rhs.mat[1][j] + lhs.mat[i][2]*rhs.mat[2][j];
+    }
+  }
+
+  return result;
+}
+
+
+Coord operator*(const Matrix& matrix, const Coord& point) {
+  int a = matrix.mat[0][0]*point.x + matrix.mat[0][1]*point.y + matrix.mat[0][2]*point.z;
+  int b = matrix.mat[1][0]*point.x + matrix.mat[1][1]*point.y + matrix.mat[1][2]*point.z;
+  int c = matrix.mat[2][0]*point.x + matrix.mat[2][1]*point.y + matrix.mat[2][2]*point.z;
+
+  return Coord{a, b, c};
+}
+
+
+struct RotMatrix {
+  Matrix matrix;
+  Rotation rot_x;
+  Rotation rot_y;
+  Rotation rot_z;
+
+  RotMatrix(Rotation r_x = ROT_0, Rotation r_y = ROT_0, Rotation r_z = ROT_0) {
+    Matrix x, y, z;
+
+    x.mat[0][0] = 1;
+    y.mat[1][1] = 1;
+    z.mat[2][2] = 1;
+
+    //Generate x matrix
+    if (r_x == ROT_0) {
+      for (int i = 1; i < 3; i++) {
+        x.mat[i][i] = 1;
+      }
+    } else if (r_x == ROT_90) {
+      x.mat[2][1] = 1;
+      x.mat[1][2] = -1;
+    } else if (r_x == ROT_180) {
+      for (int i = 1; i < 3; i++) {
+        x.mat[i][i] = -1;
+      }
+    } else if (r_x == ROT_270) {
+      x.mat[2][1] = -1;
+      x.mat[1][2] = 1;
+    }
+
+    //Generate y matrix
+    if (r_y == ROT_0) {
+      y.mat[0][0] = 1;
+      y.mat[2][2] = 1;
+    } else if (r_y == ROT_90) {
+      y.mat[0][2] = 1;
+      y.mat[2][0] = -1;
+    } else if (r_y == ROT_180) {
+      y.mat[0][0] = -1;
+      y.mat[2][2] = -1;
+    } else if (r_y == ROT_270) {
+      y.mat[0][2] = -1;
+      y.mat[2][0] = 1;
+    }
+
+    //Generate z matrix
+    if (r_z == ROT_0) {
+      for (int i = 0; i < 2; i++) {
+        z.mat[i][i] = 1;
+      }
+    } else if (r_z == ROT_90) {
+      z.mat[0][1] = -1;
+      z.mat[1][0] = 1;
+    } else if (r_z == ROT_180) {
+      for (int i = 0; i < 2; i++) {
+        z.mat[i][i] = -1;
+      }
+    } else if (r_z == ROT_270) {
+      z.mat[0][1] = 1;
+      z.mat[1][0] = -1;
+    }
+
+    rot_x = r_x;
+    rot_y = r_y;
+    rot_z = r_z;
+
+    matrix = x*y*z;
+  }
+  
+  bool operator==(const RotMatrix& rhs) {
+    return this->matrix == rhs.matrix;
+  }
+
+  bool operator!=(const RotMatrix& rhs) {
+    return !(this->matrix == rhs.matrix);
+  }
+};
+
+std::vector<RotMatrix> generateRotations() {
+  std::vector<RotMatrix> rotations;
+
+  rotations.push_back(RotMatrix(ROT_0, ROT_0, ROT_0));
+  rotations.push_back(RotMatrix(ROT_0, ROT_90, ROT_0));
+  rotations.push_back(RotMatrix(ROT_0, ROT_0, ROT_90));
+  rotations.push_back(RotMatrix(ROT_0, ROT_180, ROT_0));
+  rotations.push_back(RotMatrix(ROT_0, ROT_0, ROT_180));
+  rotations.push_back(RotMatrix(ROT_0, ROT_270, ROT_0));
+  rotations.push_back(RotMatrix(ROT_0, ROT_0, ROT_270));
+  rotations.push_back(RotMatrix(ROT_0, ROT_90, ROT_90));
+  rotations.push_back(RotMatrix(ROT_0, ROT_90, ROT_180));
+  rotations.push_back(RotMatrix(ROT_0, ROT_90, ROT_270));
+  rotations.push_back(RotMatrix(ROT_0, ROT_180, ROT_90));
+  rotations.push_back(RotMatrix(ROT_0, ROT_180, ROT_180));
+  rotations.push_back(RotMatrix(ROT_0, ROT_180, ROT_270));
+  rotations.push_back(RotMatrix(ROT_0, ROT_270, ROT_90));
+  rotations.push_back(RotMatrix(ROT_0, ROT_270, ROT_180));
+  rotations.push_back(RotMatrix(ROT_0, ROT_270, ROT_270));
+  rotations.push_back(RotMatrix(ROT_90, ROT_0, ROT_0));
+  rotations.push_back(RotMatrix(ROT_90, ROT_90, ROT_0));
+  rotations.push_back(RotMatrix(ROT_90, ROT_0, ROT_90));
+  rotations.push_back(RotMatrix(ROT_90, ROT_180, ROT_0));
+  rotations.push_back(RotMatrix(ROT_90, ROT_0, ROT_180));
+  rotations.push_back(RotMatrix(ROT_90, ROT_270, ROT_0));
+  rotations.push_back(RotMatrix(ROT_90, ROT_0, ROT_270));
+  rotations.push_back(RotMatrix(ROT_90, ROT_90, ROT_90));
+  rotations.push_back(RotMatrix(ROT_90, ROT_90, ROT_180));
+  rotations.push_back(RotMatrix(ROT_90, ROT_90, ROT_270));
+  rotations.push_back(RotMatrix(ROT_90, ROT_180, ROT_90));
+  rotations.push_back(RotMatrix(ROT_90, ROT_180, ROT_180));
+  rotations.push_back(RotMatrix(ROT_90, ROT_180, ROT_270));
+  rotations.push_back(RotMatrix(ROT_90, ROT_270, ROT_90));
+  rotations.push_back(RotMatrix(ROT_90, ROT_270, ROT_180));
+  rotations.push_back(RotMatrix(ROT_90, ROT_270, ROT_270));
+  rotations.push_back(RotMatrix(ROT_180, ROT_0, ROT_0));
+  rotations.push_back(RotMatrix(ROT_180, ROT_90, ROT_0));
+  rotations.push_back(RotMatrix(ROT_180, ROT_0, ROT_90));
+  rotations.push_back(RotMatrix(ROT_180, ROT_180, ROT_0));
+  rotations.push_back(RotMatrix(ROT_180, ROT_0, ROT_180));
+  rotations.push_back(RotMatrix(ROT_180, ROT_270, ROT_0));
+  rotations.push_back(RotMatrix(ROT_180, ROT_0, ROT_270));
+  rotations.push_back(RotMatrix(ROT_180, ROT_90, ROT_90));
+  rotations.push_back(RotMatrix(ROT_180, ROT_90, ROT_180));
+  rotations.push_back(RotMatrix(ROT_180, ROT_90, ROT_270));
+  rotations.push_back(RotMatrix(ROT_180, ROT_180, ROT_90));
+  rotations.push_back(RotMatrix(ROT_180, ROT_180, ROT_180));
+  rotations.push_back(RotMatrix(ROT_180, ROT_180, ROT_270));
+  rotations.push_back(RotMatrix(ROT_180, ROT_270, ROT_90));
+  rotations.push_back(RotMatrix(ROT_180, ROT_270, ROT_180));
+  rotations.push_back(RotMatrix(ROT_180, ROT_270, ROT_270));
+  rotations.push_back(RotMatrix(ROT_270, ROT_0, ROT_0));
+  rotations.push_back(RotMatrix(ROT_270, ROT_90, ROT_0));
+  rotations.push_back(RotMatrix(ROT_270, ROT_0, ROT_90));
+  rotations.push_back(RotMatrix(ROT_270, ROT_180, ROT_0));
+  rotations.push_back(RotMatrix(ROT_270, ROT_0, ROT_180));
+  rotations.push_back(RotMatrix(ROT_270, ROT_270, ROT_0));
+  rotations.push_back(RotMatrix(ROT_270, ROT_0, ROT_270));
+  rotations.push_back(RotMatrix(ROT_270, ROT_90, ROT_90));
+  rotations.push_back(RotMatrix(ROT_270, ROT_90, ROT_180));
+  rotations.push_back(RotMatrix(ROT_270, ROT_90, ROT_270));
+  rotations.push_back(RotMatrix(ROT_270, ROT_180, ROT_90));
+  rotations.push_back(RotMatrix(ROT_270, ROT_180, ROT_180));
+  rotations.push_back(RotMatrix(ROT_270, ROT_180, ROT_270));
+  rotations.push_back(RotMatrix(ROT_270, ROT_270, ROT_90));
+  rotations.push_back(RotMatrix(ROT_270, ROT_270, ROT_180));
+  rotations.push_back(RotMatrix(ROT_270, ROT_270, ROT_270));
+
+  RotMatrix temp;
+  for (auto i = 0u; i < rotations.size(); i++) {
+    temp = rotations[i];
+    rotations.erase(std::remove_if(rotations.begin()+i+1, rotations.end(), [&](RotMatrix& rot){ return temp == rot ;}), rotations.end());
+  }
+
+  std::cout << rotations.size() << std::endl;
+  return rotations;
 }
 #endif

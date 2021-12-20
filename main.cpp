@@ -1,5 +1,4 @@
 #include "utils.h"
-#include <algorithm>
 #include <climits>
 #include <cmath>
 #include <cstdio>
@@ -17,395 +16,221 @@
 
 #define NPOS std::string::npos
 
-void printSet(const std::set<std::pair<std::pair<char, char>, char>>& set) {
-  for (auto p : set) {
-    std::cout << "{ {" << p.first.first << ", " << p.first.second << "}, " << p.second << "}" << std::endl;
-  }
-
-  std::cout << std::endl;
+size_t calcDist(const Coord& a, const Coord& b) {
+  return abs(a.x - b.x) + abs(a.y - b.y) + abs(a.z - b.z);
 }
 
-void printMap(const std::map<std::pair<char, char>, char>& map) {
-  for (auto p : map) {
-    std::cout << "{ {" << p.first.first << ", " << p.first.second << "}, " << p.second << "}" << std::endl;
-  }
-  std::cout << std::endl;
-}
+struct Scanner {
+  Rotation rot_x = ROT_0;
+  Rotation rot_y = ROT_0;
+  Rotation rot_z = ROT_0;
+  Coord origin{0,0,0};
+  std::vector<Coord> detected;
+  std::vector<Coord> transformed;
+  std::map<std::pair<size_t, size_t>, size_t> dist;
+  std::vector<std::vector<size_t>> distVec;
 
+  void genDists() {
 
-enum ParseState {
-  LEFT,
-  RIGHT
-};
+    for (size_t i = 0; i < detected.size(); i++) {
 
-struct SnailNum {
-  bool leftIsValue = true;
-  bool rightIsValue = true;
-  short left;
-  short right;
-  SnailNum* leftNum;
-  SnailNum* rightNum;
-  SnailNum* parent;
-  short height = 0;
-
-  SnailNum(SnailNum* parent = nullptr) {
-    this->parent = parent;
-  }
-  
-  void print() {
-    std::cout << "[";
-    if (!leftIsValue) {
-      leftNum->print();
-    } else {
-      std::cout << left;
-    }
-    std::cout << ",";
-    if (!rightIsValue) {
-      rightNum->print();
-    } else {
-      std::cout << right;
-    }
-    std::cout << "]";
-  }
-
-  short calcHeight() {
-    short h = 1;
-    short h1 = (leftIsValue)? 0 : leftNum->calcHeight();
-    short h2 = (rightIsValue)? 0 : rightNum->calcHeight();
-
-    height = h + max(h1, h2);
-    return height;
-  }
-
-  size_t mag() {
-    size_t l_val = (leftIsValue)? 3*left : 3*leftNum->mag();
-    size_t r_val = (rightIsValue)? 2*right : 2*rightNum->mag();
-
-    return l_val + r_val;
-  }
-};
-
-SnailNum* deepCopy(const SnailNum* src) {
-  SnailNum* copy = new SnailNum();
-
-  copy->leftIsValue = src->leftIsValue;
-  copy->rightIsValue = src->rightIsValue;
-  copy->left = src->left;
-  copy->right = src->right;
-  if (!copy->leftIsValue) {
-    copy->leftNum = deepCopy(src->leftNum);
-    copy->leftNum->parent = copy;
-  }
-  if (!copy->rightIsValue) {
-    copy->rightNum = deepCopy(src->rightNum);
-    copy->rightNum->parent = copy;
-  }
-
-  return copy;
-}
-
-bool split(SnailNum* root) {
-  std::set<SnailNum*> visited;
-  SnailNum* curr;
-  bool splitted = false;
-  int depth = 1;
-
-  curr = root;
-
-  while (!splitted && curr) {
-    visited.insert(curr);
-    if (!curr->leftIsValue && visited.find(curr->leftNum) == visited.end()) {
-      curr = curr->leftNum;
-      depth++;
-    } else if (curr->leftIsValue && curr->left >= 10) {
-      curr->leftIsValue = false;
-      curr->leftNum = new SnailNum(curr);
-      curr->leftNum->left = curr->left/2;
-      curr->leftNum->right = (curr->left+1)/2;
-      curr->left = 0;
-      visited.insert(curr->leftNum);
-      splitted = true;
-    } else if (!curr->rightIsValue && visited.find(curr->rightNum) == visited.end()) {
-      curr = curr->rightNum;
-      depth++;
-    }else if (curr->rightIsValue && curr->right >= 10) {
-      curr->rightIsValue = false;
-      curr->rightNum = new SnailNum(curr);
-      curr->rightNum->left = curr->right/2;
-      curr->rightNum->right = (curr->right+1)/2;
-      curr->right = 0;
-      visited.insert(curr->rightNum);
-      splitted = true;
-    } else {
-      curr = curr->parent;
-      depth--;
-    }
-  }
-
-
-  return splitted;
-}
-
-bool splittable(SnailNum* root) {
-  std::set<SnailNum*> visited;
-  SnailNum* curr;
-  bool found = false;
-
-  curr = root;
-
-  while (curr && !found) {
-    visited.insert(curr);
-    if (!curr->leftIsValue && visited.find(curr->leftNum) == visited.end()) {
-      curr = curr->leftNum;
-    } else if (!curr->rightIsValue && visited.find(curr->rightNum) == visited.end()) {
-      curr = curr->rightNum;
-    } else if (curr->leftIsValue && curr->left >= 10) {
-      found = true;
-    } else if (curr->rightIsValue && curr->right >= 10) {
-      found = true;
-    } else {
-      curr = curr->parent;
-    }
-  }
-
-  return found;
-}
-
-bool explode(SnailNum* root) {
-  short depth = 1;
-  short carryLeft = -1, carryRight = -1;
-  std::set<SnailNum*> visited;
-  SnailNum* curr;
-  SnailNum* nav;
-  SnailNum* prevNav;
-  SnailNum* temp;
-  bool exploded = false;
-
-  curr = root;
-  while (!exploded && curr && depth > 0) {
-    visited.insert(curr);
-    
-    if (!curr->leftIsValue && visited.find(curr->leftNum) == visited.end()) {
-      depth++;
-      curr = curr->leftNum;
-    } else if (!curr->rightIsValue && visited.find(curr->rightNum) == visited.end()) {
-      depth++;
-      curr = curr->rightNum;
-    } else if (curr->rightIsValue && curr->leftIsValue) {
-      if (depth > 4) {
-        carryRight = curr->right;
-        carryLeft = curr->left;
+      distVec.push_back(std::vector<size_t>());
+      
+      for (size_t j = 0; j < detected.size(); j++) {
+        if (i == j) {
+          dist.insert({{i,j}, 0});
+          distVec.back().push_back(0);
+          continue;
+        }
         
-        ///Carry left
-        nav = curr->parent;
-        prevNav = curr;
-        while (nav && carryLeft != -1) {
-          if (nav->leftIsValue) {
-            nav->left += carryLeft;
-            carryLeft = -1;  
-          } else {
-            temp = nav->leftNum;
-            if (prevNav != temp) {
-              while (!temp->rightIsValue) {
-                temp = temp->rightNum;
-              }
-              temp->right += carryLeft;
-              carryLeft = -1;
-            }
-          }
-
-          prevNav = nav;
-          nav = nav->parent;
-        }
-
-        ///Carry right
-        nav = curr->parent;
-        prevNav = curr;
-        while (nav && carryRight != -1) {
-          if (nav->rightIsValue) {
-            nav->right += carryRight;
-            carryRight = -1;  
-          } else {
-            temp = nav->rightNum;
-            if (prevNav != temp) {
-              while (!temp->leftIsValue) {
-                temp = temp->leftNum;
-              }
-              temp->left += carryRight;
-              carryRight = -1;
-            }
-          }
-          prevNav = nav;
-          nav = nav->parent;
-        }
-
-
-        nav = curr->parent;
-        if (curr == nav->leftNum) {
-          nav->leftNum = nullptr;
-          nav->left = 0;
-          nav->leftIsValue = true;
+        auto found = dist.find({j, i}); 
+        if ( found == dist.end()) {
+          size_t distance = calcDist(detected[i], detected[j]);
+          dist.insert({ {i, j}, distance });
+          distVec.back().push_back(distance);
         } else {
-          nav->rightNum = nullptr;
-          nav->right = 0;
-          nav->rightIsValue = true;
+          dist.insert({ {i, j}, found->second });
+          distVec.back().push_back(found->second);
         }
-        //delete curr;
-
-
-        exploded = true;
-        curr = nav;
-        carryRight = -1;
-        carryLeft = -1;
-      } else {
-        curr = curr->parent;
       }
-      depth--;
-    } else {
-      curr = curr->parent;
-      depth--;
-    }
-
-  }
-
-  return exploded;
-}
-
-
-SnailNum* add(SnailNum* a, SnailNum* b) {
-  SnailNum* sum = new SnailNum();
-  bool splitWatch = true;
-  bool explodeWatch = true;
-
-  sum->leftIsValue = false;
-  sum->rightIsValue = false;
-
-  a->parent = sum;
-  b->parent = sum;
-
-  sum->leftNum = a;
-  sum->rightNum = b;
-
-  short h = sum->calcHeight();
-  explodeWatch = sum->calcHeight() > 4;
-  splitWatch = splittable(sum);
-
-  while (explodeWatch || splitWatch) {
-    if (explodeWatch && explode(sum)) {
-      explodeWatch = sum->calcHeight() > 4;
-      splitWatch = splittable(sum);
-    } else if (splitWatch && split(sum)) {
-      explodeWatch = sum->calcHeight() > 4;
-      splitWatch = splittable(sum);
+      
+      std::sort(distVec.back().begin(), distVec.back().end());
     }
   }
 
-  return sum;
+  //Transforms the other scanner
+  bool pointCompare(Scanner& other, size_t idx_a, size_t idx_b, const RotMatrix& m, std::set<Coord>& matchSet) {
+    int x_move, y_move, z_move;
+    size_t match = 0;
+    std::set<Coord> matchPoints;
+
+    Coord t = m.matrix*other.detected[idx_b];
+    x_move = detected[idx_a].x - t.x;
+    y_move = detected[idx_a].y - t.y;
+    z_move = detected[idx_a].z - t.z;
+
+    match++;
+    matchPoints.insert(detected[idx_a]);
+
+    for (size_t i = 0; i < other.detected.size(); i++) {
+      if (i != idx_b) {
+        t = m.matrix*other.detected[i];
+        t.x += x_move;
+        t.y += y_move;
+        t.z += z_move;
+        
+        if (std::any_of(detected.begin(), detected.end(), 
+                        [&](const auto& p){ return t == p; })) {
+          match++;
+          matchPoints.insert(t);
+        }
+      }
+    }
+
+    if (match >= 12) {
+      other.origin.x = x_move;
+      other.origin.y = y_move;
+      other.origin.z = z_move;
+      other.rot_x = m.rot_x;
+      other.rot_y = m.rot_y;
+      other.rot_z = m.rot_z;
+
+      for (auto& p : matchPoints) {
+        matchSet.insert(p);
+      }
+
+      for (size_t i = 0; i < other.detected.size(); i++) {
+        other.detected[i] = m.matrix*other.detected[i];
+        other.detected[i].x += x_move;
+        other.detected[i].y += y_move;
+        other.detected[i].z += z_move;
+      }
+    }
+
+    return match >= 12;
+  }
+};
+
+
+bool distMatch(const Scanner& a, const Scanner& b, size_t& idx_a, size_t& idx_b) {
+  size_t matchCount = 0;
+
+  for (size_t i = 0; i < a.detected.size() && matchCount < 12; i++) {
+    matchCount = 0;
+    for (size_t j = 0; j < b.detected.size() && matchCount < 12; j++) {
+      matchCount = 0;
+      std::vector<size_t> match;
+      std::set_intersection(a.distVec[i].begin(), a.distVec[i].end(),
+                            b.distVec[j].begin(), b.distVec[j].end(),
+                            std::back_inserter(match));
+      matchCount = match.size();
+      if (matchCount >= 12) {
+        idx_a = i;
+        idx_b = j;
+      }
+    }
+  }
+
+  return matchCount >= 12;
 }
 
 
-std::vector<SnailNum*> parse(std::ifstream& f) {
-  SnailNum* activeNum = nullptr;
-  SnailNum* rootNum = nullptr;
-  std::stack<SnailNum*> currNum;
-  std::vector<SnailNum*> nums;
+std::vector<Scanner> parse(std::ifstream& f) {
   std::string line;
-  ParseState state = LEFT;
+  std::vector<Scanner> scanners;
+  Scanner temp;
+  bool initial = true;
+  int x, y, z;
 
   while (std::getline(f, line)) {
-    for (const auto& c : line) {
-      if (c == '[') {
-        if (currNum.size() == 0)
-          activeNum = new SnailNum();
-        else
-          activeNum = new SnailNum(currNum.top());
-        if (currNum.size() > 0 && state == LEFT) {
-          currNum.top()->leftIsValue = false;
-          currNum.top()->leftNum = activeNum;
-        } else if (currNum.size() > 0 && state == RIGHT) {
-          currNum.top()->rightIsValue = false;
-          currNum.top()->rightNum = activeNum;
-        }
-        currNum.push(activeNum);
-        state = LEFT;
-      } else if (c == ',') {
-        state = RIGHT;
-      } else if (c == ']') {
-        if (currNum.size() == 1)
-          rootNum = currNum.top();
-        currNum.pop();
-      } else {
-        if (state == LEFT) {
-          currNum.top()->leftIsValue = true;
-          currNum.top()->left = (short)(c - '0');
-        } else if (state == RIGHT) {
-          currNum.top()->rightIsValue = true;
-          currNum.top()->right = (short)(c - '0');
-        }
-      }
+    if (line.size() <= 2) continue;
+    if (line.at(0) == '-' && line.at(1) == '-' && !initial) {
+      scanners.push_back(temp);
+      temp = Scanner();
+      continue;
+    } else if (initial) {
+      initial = false;
+      continue;
     }
-    rootNum->calcHeight();
-    nums.push_back(rootNum);
+    sscanf_s(line.c_str(), "%d%*c%d%*c%d", &x, &y, &z);
+    temp.detected.push_back(Coord{x,y,z});
   }
+  scanners.push_back(temp);
   
-  return nums;
-}
-
-
-void clear(SnailNum* root) {
-  std::deque<SnailNum*> q;
-  q.push_back(root);
-  while (q.size() > 0) {
-    SnailNum* del = q.front();
-    q.pop_front();
-    if (!del->leftIsValue)
-      q.push_back(del->leftNum);
-    if (!del->rightIsValue)
-      q.push_back(del->rightNum);
-    delete del;
-  }
+  return scanners;
 }
 
 
 int main() {
-  std::ifstream file("18/data.txt");
-  std::vector<SnailNum*> numbers = parse(file);
+  std::ifstream file("19/data.txt");
+  std::vector<Scanner> scanners = parse(file);
+  std::vector<RotMatrix> rotations = generateRotations();
+  std::set<Coord> beacons;
+  std::deque<Scanner*> scannerQueue;
+  std::set<const Scanner*> seen; 
+  size_t idx_a, idx_b;
 
-  if (numbers.size() > 1) {
-    //Part 1
+  for (auto& s : scanners) {
+    s.genDists();
+  }
 
-    SnailNum* num = add(numbers[0], numbers[1]);
-    for (auto i = 2u; i < numbers.size(); i++) {
-      num = add(num, numbers[i]);
+  scannerQueue.push_front(&(scanners[0]));
+  seen.insert(&(scanners[0]));
+
+  while (scannerQueue.size() > 0) {
+    Scanner* sc = scannerQueue.front();
+    scannerQueue.pop_front();
+    for (size_t i = 0; i < scanners.size(); i++) {
+      if (&(scanners[i]) != sc && seen.find(&(scanners[i])) == seen.end()) {
+        if (distMatch(*sc, scanners[i], idx_a, idx_b)) {
+          for (const auto& rot : rotations) {
+            if (sc->pointCompare(scanners[i], idx_a, idx_b, rot, beacons)) {
+              std::cout << std::endl;
+              seen.insert(&(scanners[i]));
+              scannerQueue.push_front(&(scanners[i]));
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  for (auto& sc : scanners) {
+    for (auto& c : sc.detected) {
+      beacons.insert(c);
     }
 
-    std::cout << num->mag();
-
-    clear(num);
-
-
-    //Part 2
-    // size_t max = 0;
-    // size_t mag;
-    // SnailNum* temp;
-
-    // for (auto i = 0u; i < numbers.size(); i++) {
-    //   for (auto j = 0u; j < numbers.size(); j++) {
-    //     if (i != j) {
-    //       temp = add(deepCopy(numbers[i]), deepCopy(numbers[j]));
-    //       mag = temp->mag();
-    //       if (mag > max) {
-    //         max = mag;
-    //       } 
-            
-    //     }
-    //   }
-    // }
-    // std::cout << max;
-
-    
     std::cout << std::endl;
   }
+
+  std::cout << "Scanner locations\n";
+
+  for (const auto& sc : scanners) {
+    sc.origin.print();
+    std::cout << "\n";
+  }
+
+  std::vector<Coord> sortedBeacons;
+  for (auto& c : beacons) {
+    sortedBeacons.push_back(c);
+  }
+
+  std::sort(sortedBeacons.begin(), sortedBeacons.end(), [](auto& a, auto& b){ return a.x < b.x;});
+  sortedBeacons.erase(std::unique(sortedBeacons.begin(), sortedBeacons.end()), sortedBeacons.end());
+
+  std::cout << sortedBeacons.size() << std::endl;
+
+  size_t max = 0;
+
+  for (size_t i = 0; i < scanners.size(); i++) {
+    for (size_t j = 0; j < scanners.size(); j++) {
+      size_t dist = calcDist(scanners[i].origin, scanners[j].origin);
+      if (dist > max) max = dist;
+    }
+  }
+
+  std::cout << max;
 
   return 0;
 }
