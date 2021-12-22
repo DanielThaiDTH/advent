@@ -16,31 +16,7 @@
 
 #define NPOS std::string::npos
 
-void iteration(std::vector<std::vector<bool>>& map, std::vector<std::vector<bool>>& output, const std::vector<bool>& alg) {
-  for (size_t i = 1; i < map.size() - 1; i++) {
-    for (size_t j = 1; j < map.size() - 1; j++) {
-      size_t num = 0;
-      num += map[i+1][j+1] ? 1 : 0;
-      num += ((map[i+1][j] ? 1 : 0) << 1);
-      num += ((map[i+1][j-1] ? 1 : 0) << 2);
-      num += ((map[i][j+1] ? 1 : 0) << 3);
-      num += ((map[i][j] ? 1 : 0) << 4);
-      num += ((map[i][j-1] ? 1 : 0) << 5);
-      num += ((map[i-1][j+1] ? 1 : 0) << 6);
-      num += ((map[i-1][j] ? 1 : 0) << 7);
-      num += ((map[i-1][j-1] ? 1 : 0) << 8);
-      output[i][j] = alg[num];
-      //std::cout << i << ", " << j << std::endl;
-    }
-  }
 
-
-  for (size_t i = 0; i < map.size(); i++) {
-    for (size_t j = 0; j < map.size(); j++) {
-      map[i][j] = output[i][j];
-    }
-  }
-}
 
 
 std::vector<bool> parse(std::ifstream& f, std::vector<std::vector<bool>>& map) {
@@ -69,47 +45,128 @@ std::vector<bool> parse(std::ifstream& f, std::vector<std::vector<bool>>& map) {
   return alg;
 }
 
+size_t getDiceVal(size_t diceLevel, size_t pos) {
+  size_t inc = (diceLevel*3 + pos)/101;
+  size_t value = (diceLevel*3 + pos)%101 + inc;
+  return value;
+}
+
+
+std::pair<uint64_t, uint64_t> solvePart2(bool player_1_active, size_t diceLevel, size_t pos_1, size_t pos_2, size_t score_1, size_t score_2) {
+  static std::vector<std::tuple<size_t, size_t, size_t>> dices {{1, 1, 1}, {1, 1, 2}, {1, 1, 3},
+                                                         /*{1, 2, 1},*/ {1, 2, 2}, {1, 2, 3},
+                                                         /*{1, 3, 1}, {1, 3, 2},*/ {1, 3, 3},
+                                                         /*{2, 1, 1}, {2, 1, 2}, {2, 1, 3},*/
+                                                         /*{2, 2, 1},*/ {2, 2, 2}, {2, 2, 3},
+                                                         /*{2, 3, 1}, {2, 3, 2},*/ {2, 3, 3},
+                                                         /*{3, 1, 1}, {3, 1, 2}, {3, 1, 3},*/
+                                                         /*{3, 2, 1}, {3, 2, 2}, {3, 2, 3},*/
+                                                         /*{3, 3, 1}, {3, 3, 2},*/ {3, 3, 3}};
+  static std::vector<size_t> dicePermute{ 1, 3, 3, 3, 6, 3, 1, 3, 3, 1 };
+  static std::unordered_map<std::string, std::pair<uint64_t, uint64_t>> wins;
+  size_t diceValue, d1, d2, d3;
+  size_t orig_score_1 = score_1, orig_score_2 = score_2;
+  size_t orig_pos_1 = pos_1, orig_pos_2 = pos_2;
+  std::pair<uint64_t, uint64_t> winCount = {0 , 0};
+  std::string key;
+  key.append(1, (player_1_active?'1':'2'));
+  key.append(1, '-');
+  key.append(1, (char)pos_1 + 48);
+  key.append(1, (char)pos_2 + 48);
+  key.append(1, (char)score_1 + 48);
+  key.append(1, (char)score_2 + 48);
+
+  //std::cout << "Calling with pos " << pos_1 + 1 << " " << pos_2 + 1 << " and score " << score_1 << " " << score_2 << std::endl;
+
+  if (wins.find(key) != wins.end()) {
+    return wins[key];
+  }
+
+
+  for (size_t i = 0; i < dices.size(); i++) {
+    if (player_1_active) {
+      std::tie(d1, d2, d3) = dices[i];
+      diceValue = d1 + d2 + d3;
+      pos_1 = (orig_pos_1 + diceValue)%10;
+      score_1 = orig_score_1 + pos_1 + 1;
+      if (score_1 >= 21) {
+        winCount.first += dicePermute[i];
+      } else {
+        std::pair<uint64_t, uint64_t> temp = solvePart2(!player_1_active, diceLevel+1, pos_1, pos_2, score_1, score_2);
+        winCount.first += dicePermute[i]*temp.first;
+        winCount.second += dicePermute[i]*temp.second;
+      }
+    } else {
+      std::tie(d1, d2, d3) = dices[i];
+      diceValue = d1 + d2 + d3; 
+      pos_2 = (orig_pos_2 + diceValue)%10;
+      score_2 = orig_score_2 + pos_2 + 1;
+      if (score_2 >= 21) {
+        winCount.second += dicePermute[i];
+      } else {
+        std::pair<uint64_t, uint64_t> temp = solvePart2(!player_1_active, diceLevel+1, pos_1, pos_2, score_1, score_2);
+        winCount.first += dicePermute[i]*temp.first;
+        winCount.second += dicePermute[i]*temp.second;
+      }
+    }
+  }
+
+  wins[key] = winCount;
+
+  return winCount;
+}
+
 
 int main() {
-  std::ifstream file("20/data.txt");
-  std::vector<std::vector<bool>> map;
-  std::vector<std::vector<bool>> global_map;
-  std::vector<std::vector<bool>> global_copy;
-  std::vector<bool> alg = parse(file, map);
+  //std::ifstream file("20/data.txt");
+  size_t score_1, score_2;
+  size_t diceLevel = 0, diceValue = 0;
+  score_1 = 0;
+  score_2 = 0;
+  size_t pos_1 = 6 - 1, pos_2 = 4 - 1;
+  bool p1Winner = false;
+  size_t rollCount = 0;
+  
 
-  for (int i = 0; i < 500; i++) {
-    global_map.push_back(std::vector<bool>());
-    global_copy.push_back(std::vector<bool>());
-    for(int j = 0; j < 500; j++) {
-      global_map.back().push_back(false);
-      global_copy.back().push_back(false);
+  while (score_1 < 1000 && score_2 < 1000) {
+    diceValue = getDiceVal(diceLevel, 1) + getDiceVal(diceLevel, 2) + getDiceVal(diceLevel, 3);
+
+    pos_1 = (pos_1+diceValue)%10;
+    score_1 += pos_1 + 1;
+    rollCount++;
+    diceLevel++;
+    
+    if (score_1 >= 1000) {
+      p1Winner = true;
+      break;
     }
+    
+    
+    diceValue = getDiceVal(diceLevel, 1) + getDiceVal(diceLevel, 2) + getDiceVal(diceLevel, 3);
+    pos_2 = (pos_2+diceValue)%10;
+    score_2 += pos_2 + 1;
+    rollCount++;
+    diceLevel++;
+  } 
+
+  if (p1Winner) {
+    std::cout << "Using player 2 as loser\n";
+    std::cout << score_2 << " * " << rollCount*3 << " = " << score_2*rollCount*3;
+  } else {
+    std::cout << "Using player 1 as loser\n";
+    std::cout << score_1 << " * " << rollCount*3 << " = " << score_1*rollCount*3;
   }
+  std::cout << std::endl;
 
-  for (size_t i = 0; i < map.size(); i++) {
-    for(size_t j = 0; j < map.back().size(); j++) {
-      global_map[i+200][j+200] = map[i][j];
-      std::cout << (map[i][j]?'#':'.');
-    }
-    std::cout << std::endl;
-  }
+  score_1 = 0;
+  score_2 = 0;
+  pos_1 = 6 - 1;
+  pos_2 = 4 - 1;
+  diceLevel = 0;
 
-  int count = 1;
+  auto wins = solvePart2(true, diceLevel, pos_1, pos_2, score_1, score_2);
 
-  for (; count <= 50; count++) {
-    iteration(global_map, global_copy, alg);
-  }
-
-  //Pixel Count
-  std::cout << "Pixel counting\n";
-  size_t pixelCount = 0;
-  for (size_t i = 1 + count; i < global_map.size() - 1 - count; i++) {
-    for (size_t j = 1 + count; j < global_map.size() - 1 - count; j++) {
-      if (global_map[i][j]) pixelCount++;
-    }
-  }
-
-  std::cout << pixelCount;
-
+  std::cout << max(wins.first, wins.second);
+  
   return 0;
 }
