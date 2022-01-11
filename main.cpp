@@ -16,157 +16,261 @@
 
 #define NPOS std::string::npos
 
+struct Cuboid {
+  int64_t x_1;
+  int64_t x_2;
+  int64_t y_1;
+  int64_t y_2;
+  int64_t z_1;
+  int64_t z_2;
+  uint64_t volume;
+
+  Cuboid(int64_t x1, int64_t x2, int64_t y1, int64_t y2, int64_t z1, int64_t z2) {
+    x_1 = x1;
+    x_2 = x2;
+    y_1 = y1;
+    y_2 = y2;
+    z_1 = z1;
+    z_2 = z2;
+    volume = llabs((x2-x1+1)*(y2-y1+1)*(z2-z1+1));
+  }
+};
 
 
+struct Action : public Cuboid {
+  bool turnOn;
 
-std::vector<bool> parse(std::ifstream& f, std::vector<std::vector<bool>>& map) {
+  Action(bool isOn, int64_t x1, int64_t x2, int64_t y1, int64_t y2, int64_t z1, int64_t z2) : 
+          Cuboid(x1, x2, y1, y2, z1, z2) {
+    turnOn = isOn;
+  }
+};
+
+
+struct Intersection : public Cuboid {
+  size_t genIdx;
+  size_t covIdx;
+  bool phantom;
+  bool dirty;
+  Intersection(size_t idx, bool img, int64_t x1, int64_t x2, int64_t y1, int64_t y2, int64_t z1, int64_t z2) :
+                Cuboid(x1, x2, y1, y2, z1, z2) {
+    phantom = img;
+    genIdx = idx;
+    covIdx = 0;
+    dirty = false;
+  }
+};
+
+
+bool intersection(const Cuboid* a, const Cuboid* b) {
+  bool intersect = true;
+
+  intersect = (a->x_1 >= b->x_1 && a->x_1 <= b->x_2) || 
+              (a->x_2 >= b->x_1 && a->x_2 <= b->x_2) ||
+              (b->x_1 >= a->x_1 && b->x_1 <= a->x_2) ||
+              (b->x_2 >= a->x_1 && b->x_2 <= a->x_2);
+  intersect = intersect && ((a->y_1 >= b->y_1 && a->y_1 <= b->y_2) ||
+                            (a->y_2 >= b->y_1 && a->y_2 <= b->y_2) ||
+                            (b->y_1 >= a->y_1 && b->y_1 <= a->y_2) ||
+                            (b->y_2 >= a->y_1 && b->y_2 <= a->y_2));
+  intersect = intersect && ((a->z_1 >= b->z_1 && a->z_1 <= b->z_2) || 
+                            (a->z_2 >= b->z_1 && a->z_2 <= b->z_2) ||
+                            (b->z_1 >= a->z_1 && b->z_1 <= a->z_2) ||
+                            (b->z_2 >= a->z_1 && b->z_2 <= a->z_2));
+
+  return intersect;
+}
+
+
+Intersection* getIntersection(const Action* a, const Action* b) {
+  int64_t x1, x2, y1, y2, z1, z2;
+
+  x1 = max(a->x_1, b->x_1);
+  x2 = min(a->x_2, b->x_2); 
+  y1 = max(a->y_1, b->y_1);
+  y2 = min(a->y_2, b->y_2);
+  z1 = max(a->z_1, b->z_1);
+  z2 = min(a->z_2, b->z_2);
+
+  return new Intersection(0, !a->turnOn, x1, x2, y1, y2, z1, z2);
+}
+
+
+uint64_t getIntersectionArea(const Intersection* a, const Intersection* b) {
+  int64_t x1, x2, y1, y2, z1, z2;
+
+  x1 = max(a->x_1, b->x_1);
+  x2 = min(a->x_2, b->x_2); 
+  y1 = max(a->y_1, b->y_1);
+  y2 = min(a->y_2, b->y_2);
+  z1 = max(a->z_1, b->z_1);
+  z2 = min(a->z_2, b->z_2);
+
+  return llabs((x2-x1+1)*(y2-y1+1)*(z2-z1+1));
+}
+
+
+std::vector<Action*> parse(std::ifstream& f) {
   std::string line;
-  std::vector<bool> alg;
-  bool initial = true;
-  auto lineparse = [](const std::string& line, std::vector<bool>& bitvec) {
-    for (const auto& c : line) {
-        if (c == '.')
-          bitvec.push_back(false);
-        else
-          bitvec.push_back(true); 
-      }
-  };
+  std::string actionType;
+  std::vector<Action*> actions;
+  bool onAction;
+  char c;
+  int64_t x1, x2, y1, y2, z1, z2;
 
   while (std::getline(f, line)) {
-    if (initial) {
-      lineparse(line, alg);
-      initial = false;
-    } else if (line.size() >= 2) {
-      map.push_back(std::vector<bool>());
-      lineparse(line, map.back());
-    }
+    std::istringstream lineStr(line);
+
+    lineStr >> actionType;
+    onAction = actionType == "on";
+    lineStr >> c;
+    lineStr >> c;
+    lineStr >> x1;
+    lineStr >> c;
+    lineStr >> c;
+    lineStr >> x2;
+    lineStr >> c;
+    lineStr >> c;
+    lineStr >> c;
+    lineStr >> y1;
+    lineStr >> c;
+    lineStr >> c;
+    lineStr >> y2;
+    lineStr >> c;
+    lineStr >> c;
+    lineStr >> c;
+    lineStr >> z1;
+    lineStr >> c;
+    lineStr >> c;
+    lineStr >> z2;
+
+    actions.push_back(new Action(onAction, x1, x2, y1, y2, z1, z2));
   }
   
-  return alg;
-}
-
-size_t getDiceVal(size_t diceLevel, size_t pos) {
-  size_t inc = (diceLevel*3 + pos)/101;
-  size_t value = (diceLevel*3 + pos)%101 + inc;
-  return value;
-}
-
-
-std::pair<uint64_t, uint64_t> solvePart2(bool player_1_active, size_t diceLevel, size_t pos_1, size_t pos_2, size_t score_1, size_t score_2) {
-  static std::vector<std::tuple<size_t, size_t, size_t>> dices {{1, 1, 1}, {1, 1, 2}, {1, 1, 3},
-                                                         /*{1, 2, 1},*/ {1, 2, 2}, {1, 2, 3},
-                                                         /*{1, 3, 1}, {1, 3, 2},*/ {1, 3, 3},
-                                                         /*{2, 1, 1}, {2, 1, 2}, {2, 1, 3},*/
-                                                         /*{2, 2, 1},*/ {2, 2, 2}, {2, 2, 3},
-                                                         /*{2, 3, 1}, {2, 3, 2},*/ {2, 3, 3},
-                                                         /*{3, 1, 1}, {3, 1, 2}, {3, 1, 3},*/
-                                                         /*{3, 2, 1}, {3, 2, 2}, {3, 2, 3},*/
-                                                         /*{3, 3, 1}, {3, 3, 2},*/ {3, 3, 3}};
-  static std::vector<size_t> dicePermute{ 1, 3, 3, 3, 6, 3, 1, 3, 3, 1 };
-  static std::unordered_map<std::string, std::pair<uint64_t, uint64_t>> wins;
-  size_t diceValue, d1, d2, d3;
-  size_t orig_score_1 = score_1, orig_score_2 = score_2;
-  size_t orig_pos_1 = pos_1, orig_pos_2 = pos_2;
-  std::pair<uint64_t, uint64_t> winCount = {0 , 0};
-  std::string key;
-  key.append(1, (player_1_active?'1':'2'));
-  key.append(1, '-');
-  key.append(1, (char)pos_1 + 48);
-  key.append(1, (char)pos_2 + 48);
-  key.append(1, (char)score_1 + 48);
-  key.append(1, (char)score_2 + 48);
-
-  //std::cout << "Calling with pos " << pos_1 + 1 << " " << pos_2 + 1 << " and score " << score_1 << " " << score_2 << std::endl;
-
-  if (wins.find(key) != wins.end()) {
-    return wins[key];
-  }
-
-
-  for (size_t i = 0; i < dices.size(); i++) {
-    if (player_1_active) {
-      std::tie(d1, d2, d3) = dices[i];
-      diceValue = d1 + d2 + d3;
-      pos_1 = (orig_pos_1 + diceValue)%10;
-      score_1 = orig_score_1 + pos_1 + 1;
-      if (score_1 >= 21) {
-        winCount.first += dicePermute[i];
-      } else {
-        std::pair<uint64_t, uint64_t> temp = solvePart2(!player_1_active, diceLevel+1, pos_1, pos_2, score_1, score_2);
-        winCount.first += dicePermute[i]*temp.first;
-        winCount.second += dicePermute[i]*temp.second;
-      }
-    } else {
-      std::tie(d1, d2, d3) = dices[i];
-      diceValue = d1 + d2 + d3; 
-      pos_2 = (orig_pos_2 + diceValue)%10;
-      score_2 = orig_score_2 + pos_2 + 1;
-      if (score_2 >= 21) {
-        winCount.second += dicePermute[i];
-      } else {
-        std::pair<uint64_t, uint64_t> temp = solvePart2(!player_1_active, diceLevel+1, pos_1, pos_2, score_1, score_2);
-        winCount.first += dicePermute[i]*temp.first;
-        winCount.second += dicePermute[i]*temp.second;
-      }
-    }
-  }
-
-  wins[key] = winCount;
-
-  return winCount;
+  return actions;
 }
 
 
 int main() {
-  //std::ifstream file("20/data.txt");
-  size_t score_1, score_2;
-  size_t diceLevel = 0, diceValue = 0;
-  score_1 = 0;
-  score_2 = 0;
-  size_t pos_1 = 6 - 1, pos_2 = 4 - 1;
-  bool p1Winner = false;
-  size_t rollCount = 0;
+  std::ifstream file("22/test.txt");
+  std::ifstream file2("22/err.txt");
+  std::vector<Action*> actions = parse(file);
+  std::map<std::tuple<int64_t, int64_t, int64_t>, bool> cubes;
+  std::vector<Intersection*> intersections;
+  std::map<size_t, std::vector<Intersection*>> toBeFilled;
+  std::map<size_t, std::vector<size_t>> intersectIdxMap;
+  std::map<std::pair<size_t, size_t>, Intersection*> intersectionMap;
+  std::set<std::pair<size_t, size_t>> seen;
   
-
-  while (score_1 < 1000 && score_2 < 1000) {
-    diceValue = getDiceVal(diceLevel, 1) + getDiceVal(diceLevel, 2) + getDiceVal(diceLevel, 3);
-
-    pos_1 = (pos_1+diceValue)%10;
-    score_1 += pos_1 + 1;
-    rollCount++;
-    diceLevel++;
-    
-    if (score_1 >= 1000) {
-      p1Winner = true;
-      break;
+  //Part 1
+  size_t cnt = 0;
+  int64_t minv = -50;
+  int64_t maxv = 50;
+  int64_t minx, maxx, miny, maxy, minz, maxz;
+  for (auto act : actions) {
+    if (act->x_1 > 50 || act->x_2 < -50) continue;
+    minx = (minv > act->x_1) ? minv : act->x_1;
+    maxx = (maxv < act->x_2) ? maxv : act->x_2;
+    for (auto x = minx; x <= maxx; x++) {
+      if (act->y_1 > 50 || act->y_2 < -50) continue; 
+      miny = (minv > act->y_1) ? minv : act->y_1;
+      maxy = (maxv < act->y_2) ? maxv : act->y_2;
+      for (auto y = miny; y <= maxy; y++) {
+        if (act->z_1 > 50 || act->z_2 < -50) continue;
+        minz = (minv > act->z_1) ? minv : act->z_1;
+        maxz = (maxv < act->z_2) ? maxv : act->z_2;
+        for (auto z = minz; z <= maxz; z++) {
+          cubes[{x, y, z}] = act->turnOn;
+        }
+      }
     }
-    
-    
-    diceValue = getDiceVal(diceLevel, 1) + getDiceVal(diceLevel, 2) + getDiceVal(diceLevel, 3);
-    pos_2 = (pos_2+diceValue)%10;
-    score_2 += pos_2 + 1;
-    rollCount++;
-    diceLevel++;
-  } 
-
-  if (p1Winner) {
-    std::cout << "Using player 2 as loser\n";
-    std::cout << score_2 << " * " << rollCount*3 << " = " << score_2*rollCount*3;
-  } else {
-    std::cout << "Using player 1 as loser\n";
-    std::cout << score_1 << " * " << rollCount*3 << " = " << score_1*rollCount*3;
   }
-  std::cout << std::endl;
 
-  score_1 = 0;
-  score_2 = 0;
-  pos_1 = 6 - 1;
-  pos_2 = 4 - 1;
-  diceLevel = 0;
+  uint64_t count = 0;
+  for (auto& c : cubes) {
+    if (c.second) {
+      count++;
+    }
+  }
 
-  auto wins = solvePart2(true, diceLevel, pos_1, pos_2, score_1, score_2);
+  std::cout << count << std::endl;
+  cubes.clear();
 
-  std::cout << max(wins.first, wins.second);
-  
+  for (auto act : actions) {
+    delete act;
+  }
+  actions.clear();
+
+  actions = parse(file2);
+
+  //Part 2
+  count = 0;
+  for (size_t i = 0; i < actions.size(); i++) {
+    std::vector<size_t> intersectList;
+    std::vector<Intersection*> unfilled;
+
+    std::cout << intersections.size() << "\n";
+    if (intersections.size() > 500000) {
+      std::cout << "Out of memory error\n";
+      for (auto inter : intersections)
+        delete inter;
+      exit(1);
+    }
+
+    for (size_t j = 0; j < i; j++) { 
+      if (actions[j]->turnOn && intersection(actions[j], actions[i])) {
+        Intersection* temp = getIntersection(actions[j], actions[i]);
+        intersections.push_back(temp);
+        intersections.back()->genIdx = i;
+        intersections.back()->covIdx = j;
+        if (actions[i]->turnOn) {
+          intersectList.push_back(j);
+          intersectionMap.insert({{i, j}, temp});
+        } else {
+          unfilled.push_back(temp);
+        }
+      }
+    }
+
+    intersectIdxMap.insert({i, intersectList});
+    toBeFilled.insert({i, unfilled});
+  }
+
+  std::cout << intersections.size() << " at end\n";
+
+  for (auto act : actions) {
+    if (act->turnOn)
+      count += act->volume;
+  }
+
+  std::cout << count << std::endl;
+
+  //uint64_t vol;
+  for (size_t i = 0; i < actions.size(); i++) {
+    for (auto& j : intersectIdxMap.find(i)->second) {
+      Intersection* inter = intersectionMap.find({i, j})->second;
+      count -= inter->volume;
+      for (auto& innerIdx : intersectIdxMap.find(j)->second) {
+        Intersection* cand = intersectionMap.find({j, innerIdx})->second;
+        if (intersection(cand, inter)) {
+          std::cout << "intersect of " << j << " and " << innerIdx << " intersects with intersect of " << i << " and " << j << std::endl;
+          count += getIntersectionArea(cand, inter);
+        }
+      }
+
+      for (auto& fill : toBeFilled) {
+        if (fill.first < i) {
+          for (auto& f : fill.second) {
+            if (intersection(f, inter)) {
+
+            }
+          }
+        }
+      }
+    }
+  }
+
+  std::cout << count;
+
   return 0;
 }
